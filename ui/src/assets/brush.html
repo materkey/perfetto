@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Brush API Request</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    background: #f5f5f5;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+  }
+
+  h1 {
+    color: #333;
+  }
+
+  .section {
+    background: white;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .section h2 {
+    margin-top: 0;
+    color: #666;
+    font-size: 18px;
+  }
+
+  button {
+    background: #4285f4;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin: 5px;
+  }
+
+  button:hover {
+    background: #357ae8;
+  }
+
+  pre {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    max-height: 400px;
+    font-size: 12px;
+  }
+
+  #resultsContainer {
+    padding: 20px;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  th {
+    background-color: #f2f2f2;
+  }
+  textarea {
+    width: 100%;
+    height: 150px;
+    margin-top: 10px;
+  }
+ select {
+   background: #f8f9fa;
+   color: #202124;
+   border: 1px solid #dadce0;
+   padding: 12px 24px;
+   border-radius: 4px;
+   cursor: pointer;
+   font-size: 14px;
+   margin: 5px;
+   display: block;
+   width: calc(100% - 10px);
+ }
+.query-controls {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+.query-controls label {
+  margin-right: 10px;
+}
+.query-controls input[type="number"] {
+  width: 80px;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #dadce0;
+  font-size: 14px;
+  margin-right: 10px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Brush API Request</h1>
+  <!-- Authenticated Request with CorpSSO Section -->
+  <div class="section">
+    <h2>Metrics API</h2>
+    <div class="query-controls">
+      <label for="metric">Metric:</label>
+      <select id="metric" style="width: auto; flex-grow: 1;">
+        <option value="android_anr">android_anr</option>
+        <option value="android_jank">android_jank</option>
+        <option value="android_startup">android_startup</option>
+      </select>
+      <button id="sendAuthCorpSsoBtn">Fetch Metric</button>
+    </div>
+    <pre id="authResponseCorpSso"></pre>
+  </div>
+
+  <!-- BigQuery API Section -->
+  <div class="section">
+    <h2>Query API</h2>
+    <label for="perfetto_sql">Perfetto SQL:</label>
+    <textarea id="perfetto_sql">select count() from slice</textarea>
+    <div class="query-controls">
+      <label for="limit">Limit:</label>
+      <input type="number" id="limit" value="10">
+      <button id="sendQueryBtn">Send Query</button>
+    </div>
+    <pre id="queryResponse"></pre>
+  </div>
+</div>
+
+<div id="resultsContainer">
+  <div id="resultsTable"></div>
+</div>
+
+
+<script>
+async function sendAuthenticatedRequestWithCorpSso() {
+  const url = 'https://brush-googleapis.corp.google.com/v1/trace_metrics';
+  const metric = document.getElementById('metric').value;
+  const data = {
+    metric_id: metric,
+    page_size: 10
+  };
+
+  const responseElement = document.getElementById('authResponseCorpSso');
+  const tableElement = document.getElementById('resultsTable');
+  responseElement.textContent = 'Fetching metric...';
+  tableElement.innerHTML = '';
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+      credentials: 'include', // needed for UberProxy authentication cookies
+      mode: 'cors'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    responseElement.textContent = JSON.stringify(result, null, 2);
+
+    if (result.columnNames && result.rows) {
+      let table = '<table><thead><tr>';
+      result.columnNames.forEach(header => {
+        table += `<th>${header}</th>`;
+      });
+      table += '</tr></thead><tbody>';
+
+      result.rows.forEach(row => {
+        table += '<tr>';
+        row.values.forEach(value => {
+          // Check if the value is a link and make it clickable
+          if (typeof value === 'string' && value.startsWith('http')) {
+            table += `<td><a href="${value}" target="_blank">${value}</a></td>`;
+          } else {
+            table += `<td>${value}</td>`;
+          }
+        });
+        table += '</tr>';
+      });
+
+      table += '</tbody></table>';
+      tableElement.innerHTML = table;
+    }
+
+    console.log('--- Fetch Succeeded (Result) ---');
+    console.log(JSON.stringify(result, null, 2));
+    
+  } catch (e) {
+    responseElement.textContent = 'Error: ' + e;
+    console.error('--- Fetch Error ---');
+    console.error(e);
+  }
+}
+
+async function sendQuery() {
+  const url = 'https://brush-googleapis.corp.google.com/v1/bigtrace/query';
+  const perfetto_sql = document.getElementById('perfetto_sql').value;
+  const limit = document.getElementById('limit').value;
+  const data = {
+    perfetto_sql: perfetto_sql,
+    trace_address: 'android_telemetry.field_trace_summaries_prod.last30days',
+    limit: parseInt(limit, 10)
+  };
+
+  const responseElement = document.getElementById('queryResponse');
+  const tableElement = document.getElementById('resultsTable');
+  responseElement.textContent = 'Sending query...';
+  tableElement.innerHTML = '';
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+      credentials: 'include',
+      mode: 'cors'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    responseElement.textContent = JSON.stringify(result, null, 2);
+
+    if (result.columnNames && result.rows) {
+      let table = '<table><thead><tr>';
+      result.columnNames.forEach(header => {
+        table += `<th>${header}</th>`;
+      });
+      table += '</tr></thead><tbody>';
+
+      result.rows.forEach(row => {
+        table += '<tr>';
+        row.values.forEach(value => {
+          if (typeof value === 'string' && value.startsWith('http')) {
+            table += `<td><a href="${value}" target="_blank">${value}</a></td>`;
+          } else {
+            table += `<td>${value}</td>`;
+          }
+        });
+        table += '</tr>';
+      });
+
+      table += '</tbody></table>';
+      tableElement.innerHTML = table;
+    }
+
+    console.log('--- Query Succeeded (Result) ---');
+    console.log(JSON.stringify(result, null, 2));
+    
+  } catch (e) {
+    responseElement.textContent = 'Error: ' + e;
+    console.error('--- Query Error ---');
+    console.error(e);
+  }
+}
+
+
+document.getElementById('sendAuthCorpSsoBtn').addEventListener('click', sendAuthenticatedRequestWithCorpSso);
+document.getElementById('sendQueryBtn').addEventListener('click', sendQuery);
+
+window.addEventListener('message', (event) => {
+ if (event.data === 'getData') {
+   const tableElement = document.getElementById('resultsTable');
+   const table = tableElement.querySelector('table');
+   if (table) {
+     const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+     const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr => {
+       return Array.from(tr.querySelectorAll('td')).map(td => td.textContent);
+     });
+     
+     const data = rows.map(row => {
+       const rowObject = {};
+       headers.forEach((header, index) => {
+           if(header) {
+               const value = row[index];
+               const numValue = Number(value);
+               rowObject[header] = isNaN(numValue) ? value : numValue;
+           }
+       });
+       return rowObject;
+     });
+
+     parent.postMessage({
+       type: 'brushData',
+       payload: {
+         data: data,
+         columns: headers,
+       },
+     }, '*');
+   }
+ }
+});
+</script>
+</body>
+</html>

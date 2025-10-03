@@ -168,6 +168,7 @@ function setupContentSecurityPolicy() {
       'https://*.googleusercontent.com',
       'https://www.googletagmanager.com',
       'https://*.google-analytics.com',
+      'https://brush-googleapis.corp.google.com',
     ],
     'object-src': ['none'],
     'connect-src': [
@@ -177,6 +178,7 @@ function setupContentSecurityPolicy() {
       'https://*.googleapis.com', // For Google Cloud Storage fetches.
       'blob:',
       'data:',
+      'https://brush-googleapis.corp.google.com',
     ].concat(rpcPolicy),
     'img-src': [
       `'self'`,

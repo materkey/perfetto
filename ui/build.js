@@ -117,6 +117,7 @@ const cfg = {
 const RULES = [
   {r: /ui\/src\/assets\/index.html/, f: copyIndexHtml},
   {r: /ui\/src\/assets\/bigtrace.html/, f: copyBigtraceHtml},
+  {r: /ui\/src\/assets\/brush.html/, f: copyBrushHtml},
   {r: /ui\/src\/open_perfetto_trace\/index.html/, f: copyOpenPerfettoTraceHtml},
   {r: /ui\/src\/assets\/((.*)[.]png)/, f: copyAssets},
   {r: /ui\/src\/assets\/(explore_page\/examples\/(.*)[.]json)/, f: copyAssets},
@@ -377,6 +378,12 @@ function copyIndexHtml(src) {
 function copyBigtraceHtml(src) {
   if (cfg.bigtrace) {
     addTask(cpHtml, [src, 'bigtrace.html']);
+  }
+}
+
+function copyBrushHtml(src) {
+  if (cfg.bigtrace) {
+    addTask(cpHtml, [src, 'brush.html']);
   }
 }
 
