@@ -135,7 +135,8 @@ message DataSourceConfig {
 
   optional PriorityBoostConfig priority_boost = 10;
 
-  // If specified, this is an incremental tracing data source that requires the service to run a ProtoVM according to the config.
+  // If specified, this is an incremental tracing data source that requires the
+  // service to run a ProtoVM according to the config.
   optional ProtoVmConfig protovm_config = 11;
 
   // Keep the lower IDs (up to 99) for fields that are *not* specific to

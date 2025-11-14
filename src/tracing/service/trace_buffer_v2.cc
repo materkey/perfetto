@@ -20,6 +20,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/ext/base/utils.h"
+#include "perfetto/ext/tracing/core/basic_types.h"
 #include "perfetto/ext/tracing/core/client_identity.h"
 #include "perfetto/ext/tracing/core/shared_memory_abi.h"
 #include "perfetto/ext/tracing/core/trace_packet.h"
@@ -284,7 +285,8 @@ ChunkSeqReader::ChunkSeqReader(TraceBufferV2* buf,
   }
 }
 
-bool ChunkSeqReader::ReadNextPacketInSeqOrder(TracePacket* out_packet) {
+bool ChunkSeqReader::ReadNextPacketInSeqOrder(TracePacket* out_packet,
+                                              ProducerID* out_producer_id) {
   PERFETTO_DCHECK(!iter_->is_padding());
   PERFETTO_DCHECK(frag_iter_.next_frag_off() >= iter_->unread_payload_off());
   PERFETTO_DCHECK(frag_iter_.next_frag_off() <= iter_->payload_size);
@@ -330,6 +332,14 @@ bool ChunkSeqReader::ReadNextPacketInSeqOrder(TracePacket* out_packet) {
       frag_iter_ = FragIterator(next_chunk);
       continue;
     }
+
+    if (out_producer_id) {
+      ProducerID producer_id;
+      WriterID writer_id;
+      GetProducerAndWriterID(iter_->pri_wri_id, &producer_id, &writer_id);
+      *out_producer_id = producer_id;
+    }
+
     Frag& frag = *maybe_frag;
     switch (frag.type) {
       case Frag::kFragWholePacket:
@@ -537,19 +547,25 @@ ChunkSeqReader::FragReassemblyResult ChunkSeqReader::ReassembleFragmentedPacket(
 // +---------------------------------------------------------------------------+
 
 // static
-std::unique_ptr<TraceBufferV2> TraceBufferV2::Create(size_t size_in_bytes,
-                                                     OverwritePolicy pol) {
+std::unique_ptr<TraceBufferV2> TraceBufferV2::Create(
+    size_t size_in_bytes,
+    OverwritePolicy pol,
+    PacketOverwriteCallback packet_overwrite_callback) {
   // The size and alignment of TBChunk have implications on the memory
   // efficiency.
   static_assert(sizeof(TBChunk) == 16);
   static_assert(alignof(TBChunk) == 4);
-  std::unique_ptr<TraceBufferV2> trace_buffer(new TraceBufferV2(pol));
+  std::unique_ptr<TraceBufferV2> trace_buffer(
+      new TraceBufferV2(pol, std::move(packet_overwrite_callback)));
   if (!trace_buffer->Initialize(size_in_bytes))
     return nullptr;
   return trace_buffer;
 }
 
-TraceBufferV2::TraceBufferV2(OverwritePolicy pol) : overwrite_policy_(pol) {}
+TraceBufferV2::TraceBufferV2(OverwritePolicy pol,
+                             PacketOverwriteCallback packet_overwrite_callback)
+    : overwrite_policy_(pol),
+      packet_overwrite_callback_(std::move(packet_overwrite_callback)) {}
 
 bool TraceBufferV2::Initialize(size_t size) {
   size = base::AlignUp(std::max(size, size_t(1)), 4096);
@@ -620,7 +636,7 @@ bool TraceBufferV2::ReadNextTracePacket(
       // fragment of the chunk is a fragmented packet and continues beyond.
       // But, +- edge cases, it logically reads only up to `chunk`.
       // If it returns false, we should continue in buffer order.
-      if (chunk_seq_reader_->ReadNextPacketInSeqOrder(out_packet)) {
+      if (chunk_seq_reader_->ReadNextPacketInSeqOrder(out_packet, nullptr)) {
         SequenceState& s = *chunk_seq_reader_->seq();
         *sequence_properties = {s.producer_id, s.client_identity, s.writer_id};
         *previous_packet_on_sequence_dropped = s.data_loss;
@@ -914,14 +930,29 @@ void TraceBufferV2::DeleteNextChunksFor(size_t bytes_to_clear) {
     ChunkSeqReader csr(this, chunk, ChunkSeqReader::kEraseMode);
     bool has_cleared_unconsumed_fragments = false;
     for (;;) {
-      // TODO(keanmariotti): if we have a ProtoVM here we should pass a non-null
-      // TracePacket. But if we don't we should pass nullptr, as AddSlice() on
-      // TracePacket has significant overhead (due to hitting the allocator)
-      TracePacket* trace_packet = nullptr;
-      if (!csr.ReadNextPacketInSeqOrder(trace_packet))
-        break;
+      // If we have a ProtoVM, passes a non-null TracePacket to read back the
+      // overwritten packet. But if we don't have a ProtoVM passes a nullptr, as
+      // AddSlice() on TracePacket has significant overhead (due to hitting the
+      // allocator).
+
+      if (packet_overwrite_callback_) {
+        // TODO(keanmariotti): do we really want to use TracePacket here?
+        // Ideally, the packet should be written into a contiguous chunk of
+        // memory to be reused across calls to ReadNextPacketInSeqOrder().
+        TracePacket trace_packet;
+        ProducerID producer_id;
+        if (!csr.ReadNextPacketInSeqOrder(&trace_packet, &producer_id))
+          break;
+        SequenceState& s = *csr.seq();
+        packet_overwrite_callback_(
+            trace_packet, PacketSequenceProperties{
+                              s.producer_id, s.client_identity, s.writer_id});
+      } else {
+        if (!csr.ReadNextPacketInSeqOrder(nullptr, nullptr))
+          break;
+      }
+
       has_cleared_unconsumed_fragments = true;
-      // TODO(keanmariotti): pass `trace_packet` to ProtoVM.
     }
 
     // In future this branch should become "&& !protovm_has_consumed_packet"

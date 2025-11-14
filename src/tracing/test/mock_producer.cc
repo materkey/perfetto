@@ -94,13 +94,15 @@ void MockProducer::RegisterDataSource(const std::string& name,
                                       bool ack_stop,
                                       bool ack_start,
                                       bool handle_incremental_state_clear,
-                                      bool no_flush) {
+                                      bool no_flush,
+                                      uint32_t vm_program_version) {
   DataSourceDescriptor ds_desc;
   ds_desc.set_name(name);
   ds_desc.set_will_notify_on_stop(ack_stop);
   ds_desc.set_will_notify_on_start(ack_start);
   ds_desc.set_handles_incremental_state_clear(handle_incremental_state_clear);
   ds_desc.set_no_flush(no_flush);
+  ds_desc.set_vm_program_version(vm_program_version);
   service_endpoint_->RegisterDataSource(ds_desc);
 }
 

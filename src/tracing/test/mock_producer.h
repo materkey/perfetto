@@ -59,7 +59,8 @@ class MockProducer : public Producer {
                           bool ack_stop = false,
                           bool ack_start = false,
                           bool handle_incremental_state_clear = false,
-                          bool no_flush = false);
+                          bool no_flush = false,
+                          uint32_t vm_program_version = 0);
   void UnregisterDataSource(const std::string& name);
   void RegisterTrackEventDataSource(
       const std::initializer_list<std::string>& categories,
