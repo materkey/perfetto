@@ -122,8 +122,7 @@ TEST_F(TracefsIntegrationTest, ANDROID_ONLY_TEST(EnableDisableEvent)) {
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("sched_switch")));
 }
 
-TEST_F(TracefsIntegrationTest,
-       ANDROID_ONLY_TEST(EnableDisableTraceBuffer)) {
+TEST_F(TracefsIntegrationTest, ANDROID_ONLY_TEST(EnableDisableTraceBuffer)) {
   ftrace_->WriteTraceMarker("Before");
   ftrace_->SetTracingOn(false);
   ftrace_->WriteTraceMarker("During");
@@ -174,8 +173,7 @@ TEST_F(TracefsIntegrationTest, ANDROID_ONLY_TEST(CanSetBufferSize)) {
   EXPECT_EQ(ReadFile("buffer_size_kb"), "20\n");  // (4096 * 5) / 1024
 }
 
-TEST_F(TracefsIntegrationTest,
-       ANDROID_ONLY_TEST(FtraceControllerHardReset)) {
+TEST_F(TracefsIntegrationTest, ANDROID_ONLY_TEST(FtraceControllerHardReset)) {
   ftrace_->SetCpuBufferSizeInPages(4ul);
   ftrace_->EnableEvent("sched", "sched_switch");
   ftrace_->WriteTraceMarker("Hello, World!");

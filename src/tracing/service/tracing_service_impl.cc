@@ -82,7 +82,7 @@
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/service/packet_stream_validator.h"
 #include "src/tracing/service/trace_buffer.h"
-#include "src/tracing/service/trace_buffer_v1.h"
+#include "src/tracing/service/trace_buffer_v2.h"
 
 #include "protos/perfetto/common/builtin_clock.gen.h"
 #include "protos/perfetto/common/builtin_clock.pbzero.h"
@@ -1104,7 +1104,7 @@ base::Status TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
             ? TraceBuffer::kDiscard
             : TraceBuffer::kOverwrite;
     auto it_and_inserted =
-        buffers_.emplace(global_id, TraceBufferV1::Create(buf_size, policy));
+        buffers_.emplace(global_id, TraceBufferV2::Create(buf_size, policy));
     PERFETTO_DCHECK(it_and_inserted.second);  // buffers_.count(global_id) == 0.
     std::unique_ptr<TraceBuffer>& trace_buffer = it_and_inserted.first->second;
     if (!trace_buffer) {
@@ -4162,7 +4162,7 @@ base::Status TracingServiceImpl::FlushAndCloneSession(
     const auto buf_policy = buf->overwrite_policy();
     const auto buf_size = buf->size();
     std::unique_ptr<TraceBuffer> old_buf = std::move(buf);
-    buf = TraceBufferV1::Create(buf_size, buf_policy);
+    buf = TraceBufferV2::Create(buf_size, buf_policy);
     if (!buf) {
       // This is extremely rare but could happen on 32-bit. If the new buffer
       // allocation failed, put back the buffer where it was and fail the clone.
@@ -4328,7 +4328,7 @@ bool TracingServiceImpl::DoCloneBuffers(const TracingSession& src,
       const auto buf_policy = src_buf->overwrite_policy();
       const auto buf_size = src_buf->size();
       new_buf = std::move(src_buf);
-      src_buf = TraceBufferV1::Create(buf_size, buf_policy);
+      src_buf = TraceBufferV2::Create(buf_size, buf_policy);
       if (!src_buf) {
         // If the allocation fails put the buffer back and let the code below
         // handle the failure gracefully.
