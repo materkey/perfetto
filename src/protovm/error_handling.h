@@ -136,15 +136,14 @@ class StatusOr {
 
   // Intentionally implicit to allow idiomatic usage (return plain value to be
   // implicitly converted to StatusOr)
-  template <
-      class... Args,
-      // sfinae to avoid clashing with copy/move constructors
-      std::enable_if_t<!internal::is_copy_or_move_ctor_arg_v<StatusOr, Args...>,
-                       int> = 0>
+  template <class... Args,
+            // sfinae to avoid clashing with copy/move constructors
+            std::enable_if_t<
+                !internal::is_copy_or_move_ctor_arg_v<StatusOr, Args...> &&
+                    !std::is_same_v<T, void>,
+                int> = 0>
   StatusOr(Args&&... args) : status_{Status::kOk} {
-    if constexpr (!std::is_same_v<T, void>) {
-      new (storage_) T(std::forward<Args>(args)...);
-    }
+    new (storage_) T(std::forward<Args>(args)...);
   }
 
   // Intentionally implicit to allow idiomatic usage (e.g. return StatusOr<A> to

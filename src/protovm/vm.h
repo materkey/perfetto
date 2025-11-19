@@ -104,12 +104,33 @@ class Vm {
   Vm(protozero::ConstBytes instructions, size_t memory_limit_bytes);
   StatusOr<void> ApplyPatch(protozero::ConstBytes packet);
   std::string SerializeIncrementalState() const;
+  std::unique_ptr<Vm> CloneReadOnly() const;
 
  private:
-  Executor executor_;
-  Parser parser_;
-  Allocator allocator_;
-  RwProto incremental_state_;
+  struct ReadWriteState {
+    ReadWriteState(protozero::ConstBytes program, size_t memory_limit_bytes)
+        : executor{},
+          parser{program, &executor},
+          allocator{memory_limit_bytes},
+          incremental_state{&allocator} {}
+
+    Executor executor;
+    Parser parser;
+    Allocator allocator;
+    RwProto incremental_state;
+  };
+
+  struct ReadOnlyState {
+    explicit ReadOnlyState(std::string incremental_state)
+        : serialized_incremental_state(std::move(incremental_state)) {}
+
+    std::string serialized_incremental_state;
+  };
+
+  // Constructor used only for cloning
+  explicit Vm(std::string incremental_state);
+
+  std::variant<ReadWriteState, ReadOnlyState> state_;
 };
 
 }  // namespace protovm

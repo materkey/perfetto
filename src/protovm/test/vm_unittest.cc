@@ -145,6 +145,29 @@ TEST_F(VmTest, ApplyPatch_ErrorHandling) {
             std::string::npos);
 }
 
+TEST_F(VmTest, CloneReadOnly) {
+  auto program =
+      SamplePrograms::IncrementalTraceInstructions().SerializeAsString();
+  Vm vm{AsConstBytes(program), MEMORY_LIMIT_BYTES};
+
+  auto patch = SamplePackets::PatchWithInitialState().SerializeAsString();
+  vm.ApplyPatch(AsConstBytes(patch));
+
+  std::unique_ptr<Vm> cloned_vm = vm.CloneReadOnly();
+
+  // Check read-only VM doesn't accept patches
+  ASSERT_TRUE(cloned_vm->ApplyPatch(AsConstBytes(patch)).IsAbort());
+
+  // Check cloned incremental state
+  protos::TraceEntry cloned_state{};
+  cloned_state.ParseFromString(cloned_vm->SerializeIncrementalState());
+  ASSERT_EQ(cloned_state.elements_size(), 2);
+  ASSERT_EQ(cloned_state.elements(0).id(), 0);
+  ASSERT_EQ(cloned_state.elements(0).value(), 10);
+  ASSERT_EQ(cloned_state.elements(1).id(), 1);
+  ASSERT_EQ(cloned_state.elements(1).value(), 11);
+}
+
 }  // namespace test
 }  // namespace protovm
 }  // namespace perfetto
