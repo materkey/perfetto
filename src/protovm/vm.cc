@@ -23,9 +23,10 @@
 namespace perfetto {
 namespace protovm {
 
-Vm::Vm(protozero::ConstBytes program, size_t memory_limit_bytes)
-    : state_(std::in_place_type_t<ReadWriteState>{},
-             program,
+Vm::Vm(std::string program, size_t memory_limit_bytes)
+    : owned_program(std::move(program)),
+      state_(std::in_place_type_t<ReadWriteState>{},
+             owned_program,
              memory_limit_bytes) {}
 
 Vm::Vm(std::string incremental_state)
@@ -49,6 +50,10 @@ std::string Vm::SerializeIncrementalState() const {
 
   const ReadWriteState* state = std::get_if<ReadWriteState>(&state_);
   return state->incremental_state.SerializeAsString();
+}
+
+std::string Vm::SerializeProgram() const {
+  return owned_program;
 }
 
 std::unique_ptr<Vm> Vm::CloneReadOnly() const {
