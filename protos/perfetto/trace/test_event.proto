@@ -49,4 +49,11 @@ message TestEvent {
     repeated DebugAnnotation debug_annotations = 7;
   }
   optional TestPayload payload = 5;
+
+  // A simple incremental state populated by the proto VM in tests.
+  message IncrementalState {
+    optional string merged_string = 1;
+    optional int32 merged_int = 2;
+  }
+  optional IncrementalState incremental_state = 6;
 }

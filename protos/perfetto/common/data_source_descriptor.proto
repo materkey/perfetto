@@ -60,6 +60,9 @@ message DataSourceDescriptor {
   // Introduced in v39 / Android V.
   optional bool no_flush = 9;
 
+  // TODO(keanmariotti): comment
+  optional uint32 vm_program_version = 10;
+
   // Optional specification about available GPU counters.
   optional GpuCounterDescriptor gpu_counter_descriptor = 5 [lazy = true];
 

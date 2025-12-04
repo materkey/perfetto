@@ -88,6 +88,7 @@ import "protos/perfetto/trace/trace_uuid.proto";
 import "protos/perfetto/trace/trigger.proto";
 import "protos/perfetto/trace/test_event.proto";
 import "protos/perfetto/trace/ui_state.proto";
+import "protos/perfetto/trace/proto_vm.proto";
 
 package perfetto.protos;
 
@@ -111,7 +112,7 @@ package perfetto.protos;
 // See the [Buffers and Dataflow](/docs/concepts/buffers.md) doc for details.
 //
 // Next reserved id: 14 (up to 15).
-// Next id: 123.
+// Next id: 124.
 message TracePacket {
   // The timestamp of the TracePacket.
   // By default this timestamps refers to the trace clock (CLOCK_BOOTTIME on
@@ -182,6 +183,7 @@ message TracePacket {
     StatsdAtom statsd_atom = 84;
     AndroidSystemProperty android_system_property = 86;
     EntityStateResidency entity_state_residency = 91;
+    ProtoVm proto_vm = 123;
 
     // Only used in profile packets.
     ModuleSymbols module_symbols = 61;
