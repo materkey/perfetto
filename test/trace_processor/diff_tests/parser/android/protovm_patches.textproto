@@ -1,0 +1,96 @@
+packet {
+  clock_snapshot {
+    primary_trace_clock: BUILTIN_CLOCK_BOOTTIME
+    clocks { clock_id: 6 timestamp: 0 }
+    clocks { clock_id: 2 timestamp: 1682359234732002451 }
+    clocks { clock_id: 4 timestamp: 0 }
+    clocks { clock_id: 1 timestamp: 1682359234732002451 }
+    clocks { clock_id: 3 timestamp: 0 }
+    clocks { clock_id: 5 timestamp: 0 }
+  }
+  trusted_uid: 9999
+  trusted_packet_sequence_id: 1
+}
+
+# Minimal ProtoVM program
+packet {
+  proto_vm {
+    program { instructions[
+        # Copy packet.surfaceflinger_transaction.elapsed_realtime_nanos
+        # into packet.timestamp
+        {
+          select { relative_path
+                   [ {
+                     field_id: 94  # surfaceflinger_transaction
+                   }
+                     ,
+                     {
+                       field_id: 1  # elapsed_realtime_nanos
+                     }] } nested_instructions
+          [ {
+            select {
+              cursor: VM_CURSOR_DST
+              create_if_not_exist: true relative_path
+              [ {
+                field_id: 8  # timestamp
+              }]
+            } nested_instructions
+            [ { set {} }]
+          }]
+        }
+        ,
+        # Copy packet.surfaceflinger_transaction.vsync_id
+        # into packet.surfaceflinger_layers_snapshot.vsync_id
+        {
+          select { relative_path
+                   [ {
+                     field_id: 94  # surfaceflinger_transaction
+                   }
+                     ,
+                     {
+                       field_id: 2  # vsync_id
+                     }] } nested_instructions
+          [ {
+            select {
+              cursor: VM_CURSOR_DST
+              create_if_not_exist: true relative_path
+              [ {
+                field_id: 93  # surfaceflinger_layers_snapshot 
+              }
+                ,
+                {
+                  field_id: 8  # vsync_id
+                }]
+            } nested_instructions
+            [ { set {} }]
+          }]
+        }] }
+    pid: 592
+  }
+}
+
+packet {
+  first_packet_on_sequence: true
+  timestamp: 2749532000000
+  timestamp_clock_id: 3
+  surfaceflinger_transactions {
+    elapsed_realtime_nanos: 2749532000001
+    vsync_id: 24776
+  }
+  trusted_uid: 1000
+  trusted_packet_sequence_id: 3
+  trusted_pid: 592
+  previous_packet_dropped: true
+}
+
+packet {
+  timestamp: 2749555000000
+  timestamp_clock_id: 3
+  surfaceflinger_transactions {
+    elapsed_realtime_nanos: 2749555000001
+    vsync_id: 24805
+  }
+  trusted_uid: 1000
+  trusted_packet_sequence_id: 3
+  trusted_pid: 592
+}

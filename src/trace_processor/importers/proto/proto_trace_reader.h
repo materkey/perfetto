@@ -30,6 +30,7 @@
 #include "src/trace_processor/importers/proto/packet_sequence_state_builder.h"
 #include "src/trace_processor/importers/proto/proto_importer_module.h"
 #include "src/trace_processor/importers/proto/proto_trace_tokenizer.h"
+#include "src/trace_processor/importers/proto/protovm_incremental_tracing.h"
 #include "src/trace_processor/storage/trace_storage.h"
 
 namespace protozero {
@@ -129,6 +130,8 @@ class ProtoTraceReader : public ChunkedTraceReader {
   base::FlatHashMap<uint32_t, SequenceScopedState> sequence_state_;
   StringId skipped_packet_key_id_;
   StringId invalid_incremental_state_key_id_;
+
+  ProtoVmIncrementalTracing protovm_incremental_tracing_;
 
   std::vector<TraceBlobView> eof_deferred_packets_;
   bool received_eof_ = false;

@@ -317,7 +317,7 @@ base::Status ProtoTraceReader::ParsePacket(TraceBlobView packet) {
   }
 
   if (decoder.has_proto_vm()) {
-    protovm_incremental_tracing_.InstantiateVm(decoder.proto_vm());
+    protovm_incremental_tracing_.InstantiateProtoVm(decoder.proto_vm());
     return base::OkStatus();
   }
 
@@ -325,7 +325,7 @@ base::Status ProtoTraceReader::ParsePacket(TraceBlobView packet) {
   if (auto inflated_state =
           protovm_incremental_tracing_.TryProcessPatch(packet);
       inflated_state) {
-    packet = std::move(*inflated_state);
+    packet = TraceBlobView(std::move(*inflated_state));
   }
 
   return TimestampTokenizeAndPushToSorter(std::move(packet));
