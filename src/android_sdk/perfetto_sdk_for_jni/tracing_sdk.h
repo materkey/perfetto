@@ -242,6 +242,29 @@ class ProtoField {
   ProtoField() {}
   static void delete_field(ProtoField* field) { delete field; }
 
+  void set_value_int64(uint32_t id, int64_t value) {
+    arg_.field_varint.header.id = id;
+    arg_.field_varint.value = value;
+  }
+
+  void set_value_double(uint32_t id, double value) {
+    arg_.field_double.header.id = id;
+    arg_.field_double.value = value;
+  }
+
+  void set_value_string(uint32_t id, const char* value) {
+    arg_.field_cstr.header.id = id;
+    arg_.field_cstr.str = value;
+  }
+
+  void set_value_string_with_interning(uint32_t id,
+                                       const char* value,
+                                       uint32_t interned_type_id) {
+    arg_.field_cstr_interned.header.id = id;
+    arg_.field_cstr_interned.str = value;
+    arg_.field_cstr_interned.interned_type_id = interned_type_id;
+  }
+
   PerfettoTeHlProtoFieldUnion* get() { return &arg_; }
 
  private:
