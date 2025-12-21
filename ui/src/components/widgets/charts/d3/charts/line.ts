@@ -98,7 +98,16 @@ export class LineRenderer extends BaseRenderer {
       .y((d) => y(d.y));
 
     // Setup brush with clip path highlighting BEFORE drawing line
-    this.setupLineBrush(g, sortedPoints, data, spec, {x, y}, width, height, line);
+    this.setupLineBrush(
+      g,
+      sortedPoints,
+      data,
+      spec,
+      {x, y},
+      width,
+      height,
+      line,
+    );
 
     // Draw line with pointer-events: none
     g.append('path')
@@ -405,7 +414,14 @@ export class LineRenderer extends BaseRenderer {
         d3.select(event.target as Element).classed('overlay')
       ) {
         const brushGroup = g.select('.brush');
-        brush.clear(brushGroup as unknown as d3.Selection<SVGGElement, unknown, null, undefined>);
+        brush.clear(
+          brushGroup as unknown as d3.Selection<
+            SVGGElement,
+            unknown,
+            null,
+            undefined
+          >,
+        );
         clearBrushVisuals();
         if (this.selectionStrategy !== undefined) {
           this.selectionStrategy.onClear({
@@ -550,7 +566,14 @@ export class LineRenderer extends BaseRenderer {
         d3.select(event.target as Element).classed('overlay')
       ) {
         const brushGroup = g.select('.brush');
-        brush.clear(brushGroup as unknown as d3.Selection<SVGGElement, unknown, null, undefined>);
+        brush.clear(
+          brushGroup as unknown as d3.Selection<
+            SVGGElement,
+            unknown,
+            null,
+            undefined
+          >,
+        );
         clearBrushVisuals();
         if (this.selectionStrategy !== undefined) {
           this.selectionStrategy.onClear({

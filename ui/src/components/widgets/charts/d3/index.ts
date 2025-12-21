@@ -30,6 +30,8 @@ export {ScatterRenderer} from './charts/scatter';
 export {BoxplotRenderer} from './charts/boxplot';
 export {HeatmapRenderer} from './charts/heatmap';
 export {LineRenderer} from './charts/line';
+export {DonutChartRenderer} from './charts/donut';
+export {ViolinRenderer} from './charts/violin';
 
 // UI layer
 export {ChartWidget, ChartWidgetAttrs} from './ui/chart_widget';

@@ -154,6 +154,27 @@ const lineColoredChart = new Chart(
   filterStore,
 );
 
+const donutChart = new Chart(
+  {
+    type: 'donut',
+    category: 'category',
+    value: 'value',
+    aggregation: 'sum',
+  },
+  dataSource,
+  filterStore,
+);
+
+const violinChart = new Chart(
+  {
+    type: 'violin',
+    x: 'category',
+    y: 'value',
+  },
+  dataSource,
+  filterStore,
+);
+
 export function renderD3Charts(_app: App): m.Children {
   // Use the shared instances created above
   return [
@@ -263,6 +284,28 @@ export function renderD3Charts(_app: App): m.Children {
       m('.chart-demo-container', [
         m('p', 'Multiple lines grouped by category with interactive legend.'),
         m(ChartWidget, {chart: lineColoredChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Donut Chart',
+      m('.chart-demo-container', [
+        m(
+          'p',
+          'Donut chart with shift-click multi-select. Click slices to filter, shift-click to select multiple.',
+        ),
+        m(ChartWidget, {chart: donutChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Violin Plot',
+      m('.chart-demo-container', [
+        m(
+          'p',
+          'Violin plot showing distribution density with quartiles and percentiles (P90, P95, P99).',
+        ),
+        m(ChartWidget, {chart: violinChart}),
       ]),
     ),
 

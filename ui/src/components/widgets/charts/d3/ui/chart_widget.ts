@@ -131,5 +131,9 @@ function getChartTitle(spec: ChartSpec): string {
       return `Heatmap: ${spec.value} by ${spec.x} × ${spec.y}`;
     case 'line':
       return `Line: ${spec.y} vs ${spec.x}`;
+    case 'donut':
+      return `Donut: ${spec.value} by ${spec.category}`;
+    case 'violin':
+      return `Violin: ${spec.y} by ${spec.x}`;
   }
 }

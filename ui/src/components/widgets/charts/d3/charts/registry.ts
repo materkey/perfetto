@@ -20,6 +20,8 @@ import {ScatterRenderer} from './scatter';
 import {BoxplotRenderer} from './boxplot';
 import {HeatmapRenderer} from './heatmap';
 import {LineRenderer} from './line';
+import {DonutChartRenderer} from './donut';
+import {ViolinRenderer} from './violin';
 
 // Factory functions to create new renderer instances per chart
 // This prevents callback collision when multiple charts share the same renderer type
@@ -31,4 +33,6 @@ export const RENDERERS: Record<string, () => ChartRenderer> = {
   boxplot: () => new BoxplotRenderer(),
   heatmap: () => new HeatmapRenderer(),
   line: () => new LineRenderer(),
+  donut: () => new DonutChartRenderer(),
+  violin: () => new ViolinRenderer(),
 };

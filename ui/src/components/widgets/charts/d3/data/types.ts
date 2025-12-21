@@ -68,4 +68,11 @@ export type ChartSpec =
       value: string;
       aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
     }
-  | {type: 'line'; x: string; y: string; colorBy?: string};
+  | {type: 'line'; x: string; y: string; colorBy?: string}
+  | {
+      type: 'donut';
+      category: string;
+      value: string;
+      aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
+    }
+  | {type: 'violin'; x: string; y: string};

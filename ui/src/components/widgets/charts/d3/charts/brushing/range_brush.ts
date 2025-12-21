@@ -54,9 +54,17 @@ export class RangeBrush extends BrushBehavior {
     const xField =
       spec.type === 'histogram' || spec.type === 'cdf'
         ? spec.x
-        : spec.type === 'scatter'
+        : spec.type === 'scatter' || spec.type === 'line'
           ? spec.x
-          : spec.x;
+          : spec.type === 'bar' || spec.type === 'boxplot'
+            ? spec.x
+            : spec.type === 'heatmap'
+              ? spec.x
+              : '';
+
+    if (!xField) {
+      return {filters: [], selectedData: []};
+    }
 
     // Filter data within the selected range
     const selectedData = data.filter((d) => {

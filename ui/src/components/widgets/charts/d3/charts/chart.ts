@@ -111,6 +111,13 @@ export class Chart {
         groupBy: [this.spec.x],
       };
     }
+    if (this.spec.type === 'donut') {
+      return {
+        fn: this.spec.aggregation,
+        field: this.spec.value,
+        groupBy: [this.spec.category],
+      };
+    }
     return undefined;
   }
 
