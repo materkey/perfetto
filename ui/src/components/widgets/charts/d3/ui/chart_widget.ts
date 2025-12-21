@@ -125,5 +125,7 @@ function getChartTitle(spec: ChartSpec): string {
       return `CDF: ${spec.x}`;
     case 'scatter':
       return `${spec.y} vs ${spec.x}`;
+    case 'boxplot':
+      return `Boxplot: ${spec.y} by ${spec.x}`;
   }
 }

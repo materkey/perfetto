@@ -27,6 +27,7 @@ export {BarChartRenderer} from './charts/bar_chart';
 export {HistogramRenderer} from './charts/histogram';
 export {CDFRenderer} from './charts/cdf';
 export {ScatterRenderer} from './charts/scatter';
+export {BoxplotRenderer} from './charts/boxplot';
 
 // UI layer
 export {ChartWidget, ChartWidgetAttrs} from './ui/chart_widget';

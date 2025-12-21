@@ -111,6 +111,16 @@ const scatterColoredChart = new Chart(
   filterStore,
 );
 
+const boxplotChart = new Chart(
+  {
+    type: 'boxplot',
+    x: 'category',
+    y: 'value',
+  },
+  dataSource,
+  filterStore,
+);
+
 export function renderD3Charts(_app: App): m.Children {
   // Use the shared instances created above
   return [
@@ -182,6 +192,14 @@ export function renderD3Charts(_app: App): m.Children {
       m('.chart-demo-container', [
         m('p', 'Scatter plot with points colored by category.'),
         m(ChartWidget, {chart: scatterColoredChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Boxplot',
+      m('.chart-demo-container', [
+        m('p', 'Boxplot showing distribution statistics (min, Q1, median, Q3, max) and outliers for each category.'),
+        m(ChartWidget, {chart: boxplotChart}),
       ]),
     ),
 
