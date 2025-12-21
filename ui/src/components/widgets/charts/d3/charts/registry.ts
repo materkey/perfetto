@@ -18,6 +18,7 @@ import {HistogramRenderer} from './histogram';
 import {CDFRenderer} from './cdf';
 import {ScatterRenderer} from './scatter';
 import {BoxplotRenderer} from './boxplot';
+import {HeatmapRenderer} from './heatmap';
 
 // Factory functions to create new renderer instances per chart
 // This prevents callback collision when multiple charts share the same renderer type
@@ -27,4 +28,5 @@ export const RENDERERS: Record<string, () => ChartRenderer> = {
   cdf: () => new CDFRenderer(),
   scatter: () => new ScatterRenderer(),
   boxplot: () => new BoxplotRenderer(),
+  heatmap: () => new HeatmapRenderer(),
 };

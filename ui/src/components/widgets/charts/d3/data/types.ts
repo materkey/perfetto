@@ -60,4 +60,11 @@ export type ChartSpec =
   | {type: 'histogram'; x: string; bins?: number}
   | {type: 'cdf'; x: string; colorBy?: string}
   | {type: 'scatter'; x: string; y: string; colorBy?: string}
-  | {type: 'boxplot'; x: string; y: string};
+  | {type: 'boxplot'; x: string; y: string}
+  | {
+      type: 'heatmap';
+      x: string;
+      y: string;
+      value: string;
+      aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
+    };

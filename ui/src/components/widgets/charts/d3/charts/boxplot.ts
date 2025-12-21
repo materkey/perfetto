@@ -62,12 +62,12 @@ export class BoxplotRenderer extends BaseRenderer {
 
       if (yValues.length === 0) return;
 
-      const q1 = d3.quantile(yValues, 0.25) || 0;
-      const median = d3.quantile(yValues, 0.5) || 0;
-      const q3 = d3.quantile(yValues, 0.75) || 0;
+      const q1 = d3.quantile(yValues, 0.25) ?? 0;
+      const median = d3.quantile(yValues, 0.5) ?? 0;
+      const q3 = d3.quantile(yValues, 0.75) ?? 0;
       const iqr = q3 - q1;
-      const minValue = Math.max(d3.min(yValues) || 0, q1 - 1.5 * iqr);
-      const maxValue = Math.min(d3.max(yValues) || 0, q3 + 1.5 * iqr);
+      const minValue = Math.max(d3.min(yValues) ?? 0, q1 - 1.5 * iqr);
+      const maxValue = Math.min(d3.max(yValues) ?? 0, q3 + 1.5 * iqr);
       const outliers = yValues.filter((v) => v < minValue || v > maxValue);
 
       boxplotData.push({
@@ -97,14 +97,10 @@ export class BoxplotRenderer extends BaseRenderer {
       .range([0, width])
       .padding(0.2);
 
-    const allValues = boxplotData.flatMap((d) => [
-      d.min,
-      d.max,
-      ...d.outliers,
-    ]);
+    const allValues = boxplotData.flatMap((d) => [d.min, d.max, ...d.outliers]);
     const y = d3
       .scaleLinear()
-      .domain([d3.min(allValues) || 0, d3.max(allValues) || 100])
+      .domain([d3.min(allValues) ?? 0, d3.max(allValues) ?? 100])
       .range([height, 0])
       .nice();
 
@@ -232,8 +228,8 @@ export class BoxplotRenderer extends BaseRenderer {
       .attr('stroke-width', 2);
 
     // Outliers
-    boxGroups.each(function (d) {
-      d3.select(this)
+    boxGroups.each((d, i, nodes) => {
+      d3.select(nodes[i])
         .selectAll('.outlier')
         .data(d.outliers)
         .enter()
@@ -412,8 +408,15 @@ export class BoxplotRenderer extends BaseRenderer {
         event.target === event.currentTarget ||
         d3.select(event.target as Element).classed('overlay')
       ) {
-        const brushGroup = g.select('.brush') as any;
-        brush.clear(brushGroup);
+        const brushGroup = g.select('.brush');
+        brush.clear(
+          brushGroup as unknown as d3.Selection<
+            SVGGElement,
+            unknown,
+            null,
+            undefined
+          >,
+        );
         clearBrushVisuals();
         if (this.selectionStrategy !== undefined) {
           this.selectionStrategy.onClear({

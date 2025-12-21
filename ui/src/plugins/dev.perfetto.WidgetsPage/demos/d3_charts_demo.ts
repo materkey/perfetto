@@ -121,6 +121,18 @@ const boxplotChart = new Chart(
   filterStore,
 );
 
+const heatmapChart = new Chart(
+  {
+    type: 'heatmap',
+    x: 'category',
+    y: 'type',
+    value: 'value',
+    aggregation: 'avg',
+  },
+  dataSource,
+  filterStore,
+);
+
 export function renderD3Charts(_app: App): m.Children {
   // Use the shared instances created above
   return [
@@ -198,8 +210,22 @@ export function renderD3Charts(_app: App): m.Children {
     renderDocSection(
       'Boxplot',
       m('.chart-demo-container', [
-        m('p', 'Boxplot showing distribution statistics (min, Q1, median, Q3, max) and outliers for each category.'),
+        m(
+          'p',
+          'Boxplot showing distribution statistics (min, Q1, median, Q3, max) and outliers for each category.',
+        ),
         m(ChartWidget, {chart: boxplotChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Heatmap',
+      m('.chart-demo-container', [
+        m(
+          'p',
+          'Heatmap showing aggregated values across two categorical dimensions with color intensity.',
+        ),
+        m(ChartWidget, {chart: heatmapChart}),
       ]),
     ),
 
