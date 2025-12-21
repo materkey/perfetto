@@ -59,7 +59,13 @@ export type ChartSpec =
     }
   | {type: 'histogram'; x: string; bins?: number}
   | {type: 'cdf'; x: string; colorBy?: string}
-  | {type: 'scatter'; x: string; y: string; colorBy?: string}
+  | {
+      type: 'scatter';
+      x: string;
+      y: string;
+      colorBy?: string;
+      showCorrelation?: boolean;
+    }
   | {type: 'boxplot'; x: string; y: string}
   | {
       type: 'heatmap';

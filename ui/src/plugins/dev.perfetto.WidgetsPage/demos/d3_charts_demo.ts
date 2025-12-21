@@ -95,6 +95,7 @@ const scatterChart = new Chart(
     type: 'scatter',
     x: 'x_coord',
     y: 'y_coord',
+    showCorrelation: true,
   },
   dataSource,
   filterStore,
@@ -106,6 +107,7 @@ const scatterColoredChart = new Chart(
     x: 'value',
     y: 'duration',
     colorBy: 'type',
+    showCorrelation: false,
   },
   dataSource,
   filterStore,
@@ -236,7 +238,10 @@ export function renderD3Charts(_app: App): m.Children {
     renderDocSection(
       'Scatter Plot',
       m('.chart-demo-container', [
-        m('p', 'Basic scatter plot showing correlation between two variables.'),
+        m(
+          'p',
+          "Basic scatter plot with correlation line and Pearson's r coefficient (showCorrelation: true).",
+        ),
         m(ChartWidget, {chart: scatterChart}),
       ]),
     ),
@@ -244,7 +249,10 @@ export function renderD3Charts(_app: App): m.Children {
     renderDocSection(
       'Scatter Plot with Color Grouping',
       m('.chart-demo-container', [
-        m('p', 'Scatter plot with points colored by category.'),
+        m(
+          'p',
+          'Scatter plot with points colored by category, correlation line hidden (showCorrelation: false).',
+        ),
         m(ChartWidget, {chart: scatterColoredChart}),
       ]),
     ),

@@ -158,6 +158,12 @@ export class ScatterRenderer extends BaseRenderer {
       .style('font-size', '12px')
       .text(spec.y);
 
+    // Draw correlation line and coefficient (if enabled in spec, default true)
+    const showCorrelation = spec.showCorrelation ?? true;
+    if (showCorrelation) {
+      this.drawCorrelationLine(g, data, spec, x, y, width);
+    }
+
     // Legend (if colorBy is specified)
     if (spec.colorBy && colorScale) {
       const categories = colorScale.domain();
@@ -191,5 +197,80 @@ export class ScatterRenderer extends BaseRenderer {
           .text(category);
       });
     }
+  }
+
+  private drawCorrelationLine(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    data: Row[],
+    spec: Extract<ChartSpec, {type: 'scatter'}>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
+    width: number,
+  ) {
+    if (data.length < 2) return;
+
+    // Calculate correlation
+    const {r, slope, intercept} = this.calculateCorrelation(data, spec);
+
+    // Draw regression line
+    const xDomain = xScale.domain();
+    const x1 = xDomain[0];
+    const x2 = xDomain[1];
+    const y1 = slope * x1 + intercept;
+    const y2 = slope * x2 + intercept;
+
+    g.append('line')
+      .attr('class', 'correlation-line')
+      .attr('x1', xScale(x1))
+      .attr('y1', yScale(y1))
+      .attr('x2', xScale(x2))
+      .attr('y2', yScale(y2))
+      .attr('stroke', '#666666')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '5,5')
+      .attr('opacity', 0.7);
+
+    // Display correlation coefficient
+    g.append('text')
+      .attr('class', 'correlation-text')
+      .attr('x', width - 10)
+      .attr('y', 15)
+      .attr('text-anchor', 'end')
+      .style('font-size', '12px')
+      .style('fill', '#666666')
+      .style('font-weight', 'bold')
+      .text(`r = ${r.toFixed(3)}`);
+  }
+
+  private calculateCorrelation(
+    data: Row[],
+    spec: Extract<ChartSpec, {type: 'scatter'}>,
+  ): {r: number; slope: number; intercept: number} {
+    const n = data.length;
+    if (n < 2) return {r: 0, slope: 0, intercept: 0};
+
+    const xValues = data.map((d) => Number(d[spec.x]));
+    const yValues = data.map((d) => Number(d[spec.y]));
+
+    const xMean = d3.mean(xValues) ?? 0;
+    const yMean = d3.mean(yValues) ?? 0;
+
+    // Calculate Pearson correlation coefficient
+    const numerator = d3.sum(
+      data,
+      (d) => (Number(d[spec.x]) - xMean) * (Number(d[spec.y]) - yMean),
+    );
+
+    const xSumSquares = d3.sum(xValues, (x) => Math.pow(x - xMean, 2));
+    const ySumSquares = d3.sum(yValues, (y) => Math.pow(y - yMean, 2));
+
+    const denominator = Math.sqrt(xSumSquares * ySumSquares);
+    const r = denominator === 0 ? 0 : numerator / denominator;
+
+    // Calculate linear regression slope and intercept
+    const slope = xSumSquares === 0 ? 0 : numerator / xSumSquares;
+    const intercept = yMean - slope * xMean;
+
+    return {r, slope, intercept};
   }
 }
