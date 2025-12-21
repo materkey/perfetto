@@ -56,6 +56,8 @@ export type ChartSpec =
       x: string;
       y: string;
       aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
+      groupBy?: string;
+      mode?: 'grouped' | 'stacked';
     }
   | {type: 'histogram'; x: string; bins?: number}
   | {type: 'cdf'; x: string; colorBy?: string}

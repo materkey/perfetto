@@ -105,10 +105,14 @@ export class Chart {
 
   private getAggregation(): Aggregation | undefined {
     if (this.spec.type === 'bar') {
+      const groupBy = [this.spec.x];
+      if (this.spec.groupBy) {
+        groupBy.push(this.spec.groupBy);
+      }
       return {
         fn: this.spec.aggregation,
         field: this.spec.y,
-        groupBy: [this.spec.x],
+        groupBy,
       };
     }
     if (this.spec.type === 'donut') {

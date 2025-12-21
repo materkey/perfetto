@@ -61,6 +61,32 @@ const barChart = new Chart(
   filterStore,
 );
 
+const groupedBarChart = new Chart(
+  {
+    type: 'bar',
+    x: 'category',
+    y: 'value',
+    aggregation: 'sum',
+    groupBy: 'type',
+    mode: 'grouped',
+  },
+  dataSource,
+  filterStore,
+);
+
+const stackedBarChart = new Chart(
+  {
+    type: 'bar',
+    x: 'category',
+    y: 'value',
+    aggregation: 'sum',
+    groupBy: 'type',
+    mode: 'stacked',
+  },
+  dataSource,
+  filterStore,
+);
+
 const histogramChart = new Chart(
   {
     type: 'histogram',
@@ -208,6 +234,28 @@ export function renderD3Charts(_app: App): m.Children {
       m('.chart-demo-container', [
         m('p', 'Aggregated bar chart with click-to-filter functionality.'),
         m(ChartWidget, {chart: barChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Grouped Bar Chart',
+      m('.chart-demo-container', [
+        m(
+          'p',
+          'Multi-series bar chart with bars grouped side-by-side. Each group represents a different category, allowing easy comparison across groups.',
+        ),
+        m(ChartWidget, {chart: groupedBarChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Stacked Bar Chart',
+      m('.chart-demo-container', [
+        m(
+          'p',
+          'Multi-series bar chart with bars stacked on top of each other. Shows both individual values and total sum for each category.',
+        ),
+        m(ChartWidget, {chart: stackedBarChart}),
       ]),
     ),
 
