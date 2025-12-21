@@ -129,5 +129,7 @@ function getChartTitle(spec: ChartSpec): string {
       return `Boxplot: ${spec.y} by ${spec.x}`;
     case 'heatmap':
       return `Heatmap: ${spec.value} by ${spec.x} × ${spec.y}`;
+    case 'line':
+      return `Line: ${spec.y} vs ${spec.x}`;
   }
 }

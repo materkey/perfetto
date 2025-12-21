@@ -67,4 +67,5 @@ export type ChartSpec =
       y: string;
       value: string;
       aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
-    };
+    }
+  | {type: 'line'; x: string; y: string; colorBy?: string};

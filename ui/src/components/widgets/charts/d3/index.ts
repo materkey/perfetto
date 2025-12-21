@@ -29,6 +29,7 @@ export {CDFRenderer} from './charts/cdf';
 export {ScatterRenderer} from './charts/scatter';
 export {BoxplotRenderer} from './charts/boxplot';
 export {HeatmapRenderer} from './charts/heatmap';
+export {LineRenderer} from './charts/line';
 
 // UI layer
 export {ChartWidget, ChartWidgetAttrs} from './ui/chart_widget';

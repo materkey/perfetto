@@ -133,6 +133,27 @@ const heatmapChart = new Chart(
   filterStore,
 );
 
+const lineChart = new Chart(
+  {
+    type: 'line',
+    x: 'x_coord',
+    y: 'y_coord',
+  },
+  dataSource,
+  filterStore,
+);
+
+const lineColoredChart = new Chart(
+  {
+    type: 'line',
+    x: 'value',
+    y: 'duration',
+    colorBy: 'type',
+  },
+  dataSource,
+  filterStore,
+);
+
 export function renderD3Charts(_app: App): m.Children {
   // Use the shared instances created above
   return [
@@ -226,6 +247,22 @@ export function renderD3Charts(_app: App): m.Children {
           'Heatmap showing aggregated values across two categorical dimensions with color intensity.',
         ),
         m(ChartWidget, {chart: heatmapChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Line Chart',
+      m('.chart-demo-container', [
+        m('p', 'Line chart connecting data points sorted by x-value.'),
+        m(ChartWidget, {chart: lineChart}),
+      ]),
+    ),
+
+    renderDocSection(
+      'Line Chart with Color Grouping',
+      m('.chart-demo-container', [
+        m('p', 'Multiple lines grouped by category with interactive legend.'),
+        m(ChartWidget, {chart: lineColoredChart}),
       ]),
     ),
 
