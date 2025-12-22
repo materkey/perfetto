@@ -37,6 +37,8 @@ interface D3ChartsPageAttrs {
   useBrushBackend?: boolean;
   initialQuery?: string;
   hideSqlEditor?: boolean;
+  sidebarVisible?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 const DEFAULT_SQL = `SELECT 
@@ -88,6 +90,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
   private availableColumns: string[] = [];
   private sidebarOpen = false;
   private nextTableId = 0;
+  private isLoading = false;
 
   // Chart creator state
   private chartCreator: ChartCreatorState = {
@@ -116,6 +119,8 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
 
   private async runQuery() {
     this.errorMessage = '';
+    this.isLoading = true;
+    m.redraw();
 
     // Clean up existing charts and tables
     this.charts.forEach((chart) => chart.destroy());
@@ -195,6 +200,9 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
     } catch (error) {
       this.errorMessage = `Error: ${error}`;
       console.error('Query error:', error);
+      m.redraw();
+    } finally {
+      this.isLoading = false;
       m.redraw();
     }
   }
@@ -493,7 +501,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
     }
   }
 
-  view() {
+  view({attrs}: m.Vnode<D3ChartsPageAttrs>) {
     return m(
       '.d3-charts-page',
       {
@@ -502,8 +510,35 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
           height: '100vh',
           overflow: 'hidden',
         },
+        oncreate: () => {
+          // Inject CSS animation for loading indicator if not already present
+          if (!document.getElementById('d3-charts-loading-animation')) {
+            const style = document.createElement('style');
+            style.id = 'd3-charts-loading-animation';
+            style.textContent = `
+              @keyframes loading-pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+        },
       },
       [
+        // Global loading indicator - thin blue line at the very top
+        this.isLoading && m('.loading-indicator', {
+          style: {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            background: 'var(--pf-color-accent)',
+            zIndex: 10000,
+            animation: 'loading-pulse 1.5s ease-in-out infinite',
+          },
+        }),
         // Main content area
         m(
           '.main-content',
@@ -528,6 +563,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                     flexDirection: 'column',
                     minHeight: '200px',
                     maxHeight: '400px',
+                    position: 'relative',
                   },
                 },
                 [
@@ -542,6 +578,15 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                       },
                     },
                     [
+                      // Hamburger button (only show if sidebar toggle callback provided and sidebar is hidden)
+                      attrs.onToggleSidebar && attrs.sidebarVisible === false &&
+                        m(Button, {
+                          icon: 'menu',
+                          onclick: attrs.onToggleSidebar,
+                          style: {
+                            fontSize: '24px',
+                          },
+                        }),
                       m(Button, {
                         label: 'Run Query',
                         icon: 'play_arrow',

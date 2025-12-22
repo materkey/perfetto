@@ -37,6 +37,13 @@ export class D3ChartBrushSource implements DataSource {
     // Build the SQL query with filters
     let query = this.baseQuery;
 
+    // Remove any existing LIMIT clause first to add it at the end
+    const limitMatch = query.match(/\bLIMIT\s+\d+/i);
+    const existingLimit = limitMatch ? limitMatch[0] : null;
+    if (existingLimit) {
+      query = query.replace(/\bLIMIT\s+\d+/i, '').trim();
+    }
+
     // Add WHERE clause if filters exist
     if (filters.length > 0) {
       const whereConditions = filters.map((f) => {
@@ -98,8 +105,10 @@ export class D3ChartBrushSource implements DataSource {
       }
     }
 
-    // Add LIMIT if not already present
-    if (!/\bLIMIT\b/i.test(query)) {
+    // Add LIMIT at the end (use existing limit if found, otherwise use default)
+    if (existingLimit) {
+      query += ` ${existingLimit}`;
+    } else {
       query += ` LIMIT ${this.limit}`;
     }
 

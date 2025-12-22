@@ -124,11 +124,10 @@ class BigTraceApp implements m.ClassComponent {
         },
       },
       [
-        // Left Sidebar
-        m(
+        // Left Sidebar (only render when visible)
+        this.sidebarVisible && m(
           'nav.pf-sidebar',
           {
-            class: this.sidebarVisible ? undefined : 'pf-sidebar--hidden',
             style: {
               width: '250px',
               flexShrink: 0,
@@ -269,6 +268,10 @@ class BigTraceApp implements m.ClassComponent {
                 ? undefined
                 : METRIC_QUERIES[this.currentPage],
             hideSqlEditor: this.currentPage !== 'bigtrace',
+            sidebarVisible: this.sidebarVisible,
+            onToggleSidebar: () => {
+              this.sidebarVisible = !this.sidebarVisible;
+            },
           }),
         ),
       ],
