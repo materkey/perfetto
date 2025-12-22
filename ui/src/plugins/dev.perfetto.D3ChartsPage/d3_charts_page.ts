@@ -16,6 +16,8 @@ import m from 'mithril';
 import {Trace} from '../../public/trace';
 import {D3ChartSqlSource} from '../../components/widgets/d3_chart_sql_source';
 import {Chart, FilterStore, ChartSpec} from '../../widgets/charts/d3';
+import {DataSource} from '../../widgets/charts/d3/data/source';
+import {D3ChartBrushSource} from '../../components/widgets/d3_chart_brush_source';
 import {ChartWidget} from '../../widgets/d3_chart_widget';
 import {Button} from '../../widgets/button';
 import {Editor} from '../../widgets/editor';
@@ -31,7 +33,10 @@ import {Filter as DataGridFilter} from '../../components/widgets/datagrid/model'
 import {Filter as D3Filter} from '../../widgets/charts/d3/data/types';
 
 interface D3ChartsPageAttrs {
-  trace: Trace;
+  trace?: Trace;
+  useBrushBackend?: boolean;
+  initialQuery?: string;
+  hideSqlEditor?: boolean;
 }
 
 const DEFAULT_SQL = `SELECT 
@@ -75,8 +80,11 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
   private filterStore = new FilterStore();
   private sqlQuery = DEFAULT_SQL;
   private trace?: Trace;
+  private useBrushBackend = false;
+  private hideSqlEditor = false;
   private errorMessage = '';
   private sqlSource?: D3ChartSqlSource;
+  private dataSource?: DataSource;
   private availableColumns: string[] = [];
   private sidebarOpen = false;
   private nextTableId = 0;
@@ -98,13 +106,15 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
 
   oninit({attrs}: m.Vnode<D3ChartsPageAttrs>) {
     this.trace = attrs.trace;
+    this.useBrushBackend = attrs.useBrushBackend || false;
+    this.hideSqlEditor = attrs.hideSqlEditor || false;
+    if (attrs.initialQuery) {
+      this.sqlQuery = attrs.initialQuery;
+    }
     this.runQuery();
   }
 
   private async runQuery() {
-    if (!this.trace) return;
-
-    const engine = this.trace.engine;
     this.errorMessage = '';
 
     // Clean up existing charts and tables
@@ -114,47 +124,71 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
     this.tables = [];
 
     try {
-      // Handle INCLUDE PERFETTO MODULE statements
-      // These need to be executed separately before the main query
-      const lines = this.sqlQuery.trim().split('\n');
-      const includeStatements: string[] = [];
-      const queryLines: string[] = [];
+      if (this.useBrushBackend) {
+        // Use Brush backend
+        this.dataSource = new D3ChartBrushSource(
+          this.sqlQuery,
+          'android_telemetry.field_trace_summaries_prod.last30days',
+          10000,
+        );
 
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (trimmedLine.toUpperCase().startsWith('INCLUDE PERFETTO MODULE')) {
-          includeStatements.push(trimmedLine);
-        } else if (trimmedLine) {
-          queryLines.push(line);
+        // Fetch a sample row to get available columns
+        const sampleData = await this.dataSource.query([], undefined);
+        if (sampleData.length > 0) {
+          this.availableColumns = Object.keys(sampleData[0]);
+        } else {
+          this.availableColumns = [];
+          this.errorMessage =
+            'Query executed successfully but returned no data. Try adjusting your query or increasing the LIMIT.';
         }
-      }
-
-      // Execute INCLUDE statements first
-      for (const includeStmt of includeStatements) {
-        await engine.query(includeStmt);
-      }
-
-      // Use the remaining query (without INCLUDE statements)
-      const actualQuery = queryLines.join('\n').trim();
-
-      if (!actualQuery) {
-        this.errorMessage =
-          'No SELECT query found. Please add a SELECT statement after the INCLUDE statements.';
-        m.redraw();
-        return;
-      }
-
-      // Create a SQL-based data source with the actual query
-      this.sqlSource = new D3ChartSqlSource(engine, actualQuery);
-
-      // Fetch a sample row to get available columns
-      const sampleData = await this.sqlSource.query([], undefined);
-      if (sampleData.length > 0) {
-        this.availableColumns = Object.keys(sampleData[0]);
       } else {
-        this.availableColumns = [];
-        this.errorMessage =
-          'Query executed successfully but returned no data. Try adjusting your query or increasing the LIMIT.';
+        // Use local trace engine
+        if (!this.trace) return;
+
+        const engine = this.trace.engine;
+
+        // Handle INCLUDE PERFETTO MODULE statements
+        const lines = this.sqlQuery.trim().split('\n');
+        const includeStatements: string[] = [];
+        const queryLines: string[] = [];
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine.toUpperCase().startsWith('INCLUDE PERFETTO MODULE')) {
+            includeStatements.push(trimmedLine);
+          } else if (trimmedLine) {
+            queryLines.push(line);
+          }
+        }
+
+        // Execute INCLUDE statements first
+        for (const includeStmt of includeStatements) {
+          await engine.query(includeStmt);
+        }
+
+        // Use the remaining query (without INCLUDE statements)
+        const actualQuery = queryLines.join('\n').trim();
+
+        if (!actualQuery) {
+          this.errorMessage =
+            'No SELECT query found. Please add a SELECT statement after the INCLUDE statements.';
+          m.redraw();
+          return;
+        }
+
+        // Create a SQL-based data source with the actual query
+        this.sqlSource = new D3ChartSqlSource(engine, actualQuery);
+        this.dataSource = this.sqlSource;
+
+        // Fetch a sample row to get available columns
+        const sampleData = await this.dataSource.query([], undefined);
+        if (sampleData.length > 0) {
+          this.availableColumns = Object.keys(sampleData[0]);
+        } else {
+          this.availableColumns = [];
+          this.errorMessage =
+            'Query executed successfully but returned no data. Try adjusting your query or increasing the LIMIT.';
+        }
       }
 
       m.redraw();
@@ -210,7 +244,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
   }
 
   private async createChart() {
-    if (!this.canCreateChart() || !this.sqlSource) return;
+    if (!this.canCreateChart() || !this.dataSource) return;
 
     const {
       selectedType,
@@ -311,17 +345,17 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
         return;
     }
 
-    this.charts.push(new Chart(spec, this.sqlSource, this.filterStore));
+    this.charts.push(new Chart(spec, this.dataSource, this.filterStore));
     this.resetChartCreator();
     m.redraw();
   }
 
   private async createTable() {
-    if (!this.sqlSource) return;
+    if (!this.dataSource) return;
 
     try {
       // Fetch all data for the table
-      const data = await this.sqlSource.query([], undefined);
+      const data = await this.dataSource.query([], undefined);
 
       if (data.length === 0) {
         this.errorMessage = 'No data available to display in table';
@@ -482,89 +516,91 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
             },
           },
           [
-            // SQL Editor Section
-            m(
-              '.sql-editor-section',
-              {
-                style: {
-                  background: 'var(--pf-color-background)',
-                  borderBottom: '1px solid var(--pf-color-border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  minHeight: '200px',
-                  maxHeight: '400px',
-                },
-              },
-              [
-                m(
-                  '.editor-header.pf-stack.pf-stack--horiz.pf-spacing-medium',
-                  {
-                    style: {
-                      padding: '8px 16px',
-                      borderBottom: '1px solid var(--pf-color-border)',
-                      background: 'var(--pf-color-background-secondary)',
-                      alignItems: 'center',
-                    },
+            // SQL Editor Section (conditionally rendered)
+            !this.hideSqlEditor &&
+              m(
+                '.sql-editor-section',
+                {
+                  style: {
+                    background: 'var(--pf-color-background)',
+                    borderBottom: '1px solid var(--pf-color-border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '200px',
+                    maxHeight: '400px',
                   },
-                  [
-                    m(Button, {
-                      label: 'Run Query',
-                      icon: 'play_arrow',
-                      onclick: () => this.runQuery(),
-                    }),
-                    m('.pf-stack.pf-stack--horiz.pf-spacing-medium', [
-                      'or press',
-                      m('span.pf-hotkey', [
-                        m(
-                          'span.pf-keycap.pf-spacing-medium',
-                          m(Icon, {icon: 'keyboard_command_key'}),
-                        ),
-                        m(
-                          'span.pf-keycap.pf-spacing-medium',
-                          m(Icon, {icon: 'keyboard_return'}),
-                        ),
-                      ]),
-                    ]),
-                    m('.pf-stack-auto'),
-                    m(Switch, {
-                      label: 'Update source chart',
-                      checked: this.filterStore.getUpdateSourceChart(),
-                      onchange: (e: Event) => {
-                        const checked = (e.target as HTMLInputElement).checked;
-                        this.filterStore.setUpdateSourceChart(checked);
-                      },
-                    }),
-                  ],
-                ),
-                m(
-                  '.editor-container',
-                  {style: {flex: 1, overflow: 'hidden'}},
-                  m(Editor, {
-                    text: this.sqlQuery,
-                    language: 'perfetto-sql',
-                    fillHeight: true,
-                    onUpdate: (text: string) => {
-                      this.sqlQuery = text;
-                    },
-                    onExecute: () => this.runQuery(),
-                  }),
-                ),
-                this.errorMessage &&
+                },
+                [
                   m(
-                    '.error-message',
+                    '.editor-header.pf-stack.pf-stack--horiz.pf-spacing-medium',
                     {
                       style: {
                         padding: '8px 16px',
-                        background: 'var(--pf-color-error-background)',
-                        borderTop: '1px solid var(--pf-color-error)',
-                        color: 'var(--pf-color-error)',
-                        fontSize: '12px',
+                        borderBottom: '1px solid var(--pf-color-border)',
+                        background: 'var(--pf-color-background-secondary)',
+                        alignItems: 'center',
                       },
                     },
-                    this.errorMessage,
+                    [
+                      m(Button, {
+                        label: 'Run Query',
+                        icon: 'play_arrow',
+                        onclick: () => this.runQuery(),
+                      }),
+                      m('.pf-stack.pf-stack--horiz.pf-spacing-medium', [
+                        'or press',
+                        m('span.pf-hotkey', [
+                          m(
+                            'span.pf-keycap.pf-spacing-medium',
+                            m(Icon, {icon: 'keyboard_command_key'}),
+                          ),
+                          m(
+                            'span.pf-keycap.pf-spacing-medium',
+                            m(Icon, {icon: 'keyboard_return'}),
+                          ),
+                        ]),
+                      ]),
+                      m('.pf-stack-auto'),
+                      m(Switch, {
+                        label: 'Update source chart',
+                        checked: this.filterStore.getUpdateSourceChart(),
+                        onchange: (e: Event) => {
+                          const checked = (e.target as HTMLInputElement)
+                            .checked;
+                          this.filterStore.setUpdateSourceChart(checked);
+                        },
+                      }),
+                    ],
                   ),
-              ],
-            ),
+                  m(
+                    '.editor-container',
+                    {style: {flex: 1, overflow: 'hidden'}},
+                    m(Editor, {
+                      text: this.sqlQuery,
+                      language: 'perfetto-sql',
+                      fillHeight: true,
+                      onUpdate: (text: string) => {
+                        this.sqlQuery = text;
+                      },
+                      onExecute: () => this.runQuery(),
+                    }),
+                  ),
+                  this.errorMessage &&
+                    m(
+                      '.error-message',
+                      {
+                        style: {
+                          padding: '8px 16px',
+                          background: 'var(--pf-color-error-background)',
+                          borderTop: '1px solid var(--pf-color-error)',
+                          color: 'var(--pf-color-error)',
+                          fontSize: '12px',
+                        },
+                      },
+                      this.errorMessage,
+                    ),
+                ],
+              ),
 
             // Charts Column
             m(
