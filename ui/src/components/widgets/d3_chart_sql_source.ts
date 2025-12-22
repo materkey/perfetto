@@ -18,18 +18,65 @@ import {DataSource} from '../../widgets/charts/d3/data/source';
 import {Filter, Aggregation, Row} from '../../widgets/charts/d3/data/types';
 
 /**
- * D3ChartBackendSource implements the DataSource interface using Perfetto SQL.
- * It translates filters and aggregations into SQL queries and executes them
- * against the trace processor engine.
+ * D3ChartSqlSource implements the DataSource interface using a custom SQL query.
+ * It executes the provided SQL query and applies filters/aggregations on top of it.
  */
-export class D3ChartBackendSource implements DataSource {
+export class D3ChartSqlSource implements DataSource {
   constructor(
     private engine: Engine,
-    private tableName: string,
+    private sqlQuery: string,
   ) {}
 
   async query(filters: Filter[], aggregation?: Aggregation): Promise<Row[]> {
-    const sql = this.buildQuery(filters, aggregation);
+    // Wrap the user's query in a CTE and apply filters/aggregations
+    let sql = '';
+
+    if (aggregation || filters.length > 0) {
+      // Use the user's query as a CTE
+      sql = `WITH user_query AS (${this.sqlQuery})\n`;
+
+      if (aggregation) {
+        // Build aggregation query
+        const {fn, field, groupBy} = aggregation;
+
+        // SELECT clause
+        const selectParts: string[] = [];
+        for (const col of groupBy) {
+          selectParts.push(this.escapeIdentifier(col));
+        }
+
+        // Add aggregation function
+        const aggExpr = this.buildAggregationExpr(fn, field);
+        selectParts.push(`${aggExpr} AS ${this.escapeIdentifier(field)}`);
+
+        sql += `SELECT ${selectParts.join(', ')} FROM user_query`;
+
+        // WHERE clause
+        if (filters.length > 0) {
+          const whereClause = this.buildWhereClause(filters);
+          sql += ` WHERE ${whereClause}`;
+        }
+
+        // GROUP BY clause
+        if (groupBy.length > 0) {
+          const groupByClause = groupBy
+            .map((col) => this.escapeIdentifier(col))
+            .join(', ');
+          sql += ` GROUP BY ${groupByClause}`;
+        }
+      } else {
+        // Just apply filters
+        sql += `SELECT * FROM user_query`;
+        if (filters.length > 0) {
+          const whereClause = this.buildWhereClause(filters);
+          sql += ` WHERE ${whereClause}`;
+        }
+      }
+    } else {
+      // No filters or aggregations, use the query as-is
+      sql = this.sqlQuery;
+    }
+
     const result = await this.engine.query(sql);
 
     // Convert QueryResult to Row[]
@@ -61,52 +108,6 @@ export class D3ChartBackendSource implements DataSource {
     }
 
     return rows;
-  }
-
-  private buildQuery(filters: Filter[], aggregation?: Aggregation): string {
-    let sql = '';
-
-    if (aggregation) {
-      // Build aggregation query
-      const {fn, field, groupBy} = aggregation;
-
-      // SELECT clause
-      const selectParts: string[] = [];
-      for (const col of groupBy) {
-        selectParts.push(this.escapeIdentifier(col));
-      }
-
-      // Add aggregation function
-      const aggExpr = this.buildAggregationExpr(fn, field);
-      selectParts.push(`${aggExpr} AS ${this.escapeIdentifier(field)}`);
-
-      sql = `SELECT ${selectParts.join(', ')} FROM ${this.escapeIdentifier(this.tableName)}`;
-
-      // WHERE clause
-      if (filters.length > 0) {
-        const whereClause = this.buildWhereClause(filters);
-        sql += ` WHERE ${whereClause}`;
-      }
-
-      // GROUP BY clause
-      if (groupBy.length > 0) {
-        const groupByClause = groupBy
-          .map((col) => this.escapeIdentifier(col))
-          .join(', ');
-        sql += ` GROUP BY ${groupByClause}`;
-      }
-    } else {
-      // Build simple SELECT query
-      sql = `SELECT * FROM ${this.escapeIdentifier(this.tableName)}`;
-
-      // WHERE clause
-      if (filters.length > 0) {
-        const whereClause = this.buildWhereClause(filters);
-        sql += ` WHERE ${whereClause}`;
-      }
-    }
-
-    return sql;
   }
 
   private buildWhereClause(filters: Filter[]): string {
