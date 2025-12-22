@@ -15,12 +15,8 @@
 import m from 'mithril';
 import {App} from '../../../public/app';
 import {renderDocSection, renderWidgetShowcase} from '../widgets_page_utils';
-import {
-  MemorySource,
-  FilterStore,
-  Chart,
-  ChartWidget,
-} from '../../../components/widgets/charts/d3';
+import {MemorySource, FilterStore, Chart} from '../../../widgets/charts/d3';
+import {ChartWidget} from '../../../widgets/d3_chart_widget';
 
 // Generate sample data for demonstrations
 function generateSampleData() {

@@ -16,7 +16,6 @@
 export {Filter, Aggregation, Row, ChartSpec} from './data/types';
 export {DataSource} from './data/source';
 export {MemorySource} from './data/memory_source';
-export {BackendSource} from './data/backend_source';
 export {FilterStore} from './data/filter_store';
 
 // Chart layer
@@ -32,9 +31,6 @@ export {HeatmapRenderer} from './charts/heatmap';
 export {LineRenderer} from './charts/line';
 export {DonutChartRenderer} from './charts/donut';
 export {ViolinRenderer} from './charts/violin';
-
-// UI layer
-export {ChartWidget, ChartWidgetAttrs} from './ui/chart_widget';
 
 // Utils
 export {truncate, formatNumber} from './utils';

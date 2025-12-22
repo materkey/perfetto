@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import m from 'mithril';
-import {Chart} from '../charts/chart';
-import {RENDERERS} from '../charts/registry';
-import {ChartSpec} from '../data/types';
-import {Spinner} from '../../../../../widgets/spinner';
+import {Chart} from './charts/d3/charts/chart';
+import {RENDERERS} from './charts/d3/charts/registry';
+import {ChartSpec} from './charts/d3/data/types';
+import {Spinner} from './spinner';
 
 export interface ChartWidgetAttrs {
   chart: Chart;
