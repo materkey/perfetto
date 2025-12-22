@@ -325,6 +325,15 @@ export class Chart {
     this.unsubSettings();
   }
 
+  /**
+   * Force a re-render of the chart (useful for resize events).
+   */
+  refresh() {
+    if (this.lastSvg && this.lastRenderer) {
+      this.render(this.lastSvg, this.lastRenderer);
+    }
+  }
+
   clone(): Chart {
     return new Chart(
       JSON.parse(JSON.stringify(this.spec)),

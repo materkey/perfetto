@@ -38,16 +38,11 @@ export const ChartWidget: m.Component<ChartWidgetAttrs> = {
     const renderer = rendererFactory();
 
     attrs.chart.onDataChange = () => {
-      console.log('[ChartWidget] onDataChange triggered');
       attrs.chart.render(svg, renderer);
       m.redraw();
     };
 
-    attrs.chart.onFilterStateChange = (hasFilter) => {
-      console.log(
-        '[ChartWidget] onFilterStateChange triggered, hasFilter:',
-        hasFilter,
-      );
+    attrs.chart.onFilterStateChange = () => {
       m.redraw();
     };
 

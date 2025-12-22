@@ -22,6 +22,7 @@ import {Editor} from '../../widgets/editor';
 import {Select} from '../../widgets/select';
 import {Icon} from '../../widgets/icon';
 import {FormLabel} from '../../widgets/form';
+import {Switch} from '../../widgets/switch';
 import {DataGrid} from '../../components/widgets/datagrid/datagrid';
 import {SchemaRegistry} from '../../components/widgets/datagrid/datagrid_schema';
 import {InMemoryDataSource} from '../../components/widgets/datagrid/in_memory_data_source';
@@ -368,29 +369,29 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
 
       // Subscribe to filter changes - convert D3 filters to DataGrid format and update
       const unsubscribe = this.filterStore.subscribe((notification) => {
-        console.log('[Table] Filter notification received:', {
-          filters: notification.filters,
-          sourceChartId: notification.sourceChartId,
-        });
-        
         // Convert all D3 filters to DataGrid format
-        const dataGridFilters: DataGridFilter[] = notification.filters.map((f) => {
-          if (f.val === null) {
-            // Null value filters
-            return {
-              field: f.col,
-              op: f.op as 'is null' | 'is not null',
-            } as DataGridFilter;
-          } else {
-            // Value-based filters
-            return {
-              field: f.col,
-              op: f.op as Exclude<DataGridFilter['op'], 'is null' | 'is not null'>,
-              value: f.val,
-            } as DataGridFilter;
-          }
-        });
-        
+        const dataGridFilters: DataGridFilter[] = notification.filters.map(
+          (f) => {
+            if (f.val === null) {
+              // Null value filters
+              return {
+                field: f.col,
+                op: f.op as 'is null' | 'is not null',
+              } as DataGridFilter;
+            } else {
+              // Value-based filters
+              return {
+                field: f.col,
+                op: f.op as Exclude<
+                  DataGridFilter['op'],
+                  'is null' | 'is not null'
+                >,
+                value: f.val,
+              } as DataGridFilter;
+            }
+          },
+        );
+
         // Build a map from filter key to group ID
         const filterGroupMap = new Map<string, string>();
         for (const group of this.filterStore.getFilterGroups()) {
@@ -399,7 +400,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
             filterGroupMap.set(key, group.id);
           }
         }
-        
+
         tableView.allFilters = dataGridFilters;
         tableView.filterGroupMap = filterGroupMap;
         m.redraw();
@@ -496,38 +497,43 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
               },
               [
                 m(
-                  '.editor-header',
+                  '.editor-header.pf-stack.pf-stack--horiz.pf-spacing-medium',
                   {
                     style: {
                       padding: '8px 16px',
                       borderBottom: '1px solid var(--pf-color-border)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
                       background: 'var(--pf-color-background-secondary)',
+                      alignItems: 'center',
                     },
                   },
                   [
-                    m(
-                      'h3',
-                      {style: {margin: 0, fontSize: '14px', fontWeight: 500}},
-                      'SQL Query',
-                    ),
-                    m('.button-row', {style: {display: 'flex', gap: '8px'}}, [
-                      m(Button, {
-                        label: 'Run Query',
-                        icon: 'play_arrow',
-                        onclick: () => this.runQuery(),
-                      }),
-                      m(Button, {
-                        label: 'Reset',
-                        icon: 'refresh',
-                        onclick: () => {
-                          this.sqlQuery = DEFAULT_SQL;
-                          this.runQuery();
-                        },
-                      }),
+                    m(Button, {
+                      label: 'Run Query',
+                      icon: 'play_arrow',
+                      onclick: () => this.runQuery(),
+                    }),
+                    m('.pf-stack.pf-stack--horiz.pf-spacing-medium', [
+                      'or press',
+                      m('span.pf-hotkey', [
+                        m(
+                          'span.pf-keycap.pf-spacing-medium',
+                          m(Icon, {icon: 'keyboard_command_key'}),
+                        ),
+                        m(
+                          'span.pf-keycap.pf-spacing-medium',
+                          m(Icon, {icon: 'keyboard_return'}),
+                        ),
+                      ]),
                     ]),
+                    m('.pf-stack-auto'),
+                    m(Switch, {
+                      label: 'Update source chart',
+                      checked: this.filterStore.getUpdateSourceChart(),
+                      onchange: (e: Event) => {
+                        const checked = (e.target as HTMLInputElement).checked;
+                        this.filterStore.setUpdateSourceChart(checked);
+                      },
+                    }),
                   ],
                 ),
                 m(
@@ -580,6 +586,11 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                     {
                       onclick: () => {
                         this.sidebarOpen = true;
+                        // Trigger chart re-render after sidebar opens
+                        setTimeout(() => {
+                          this.charts.forEach((chart) => chart.refresh());
+                          m.redraw();
+                        }, 300);
                       },
                       style: {
                         display: 'flex',
@@ -679,11 +690,6 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                             })),
                             filters: table.allFilters,
                             onFiltersChanged: (newFilters) => {
-                              console.log(
-                                '[Table] DataGrid filters changed by user:',
-                                newFilters,
-                              );
-                              
                               // Determine which filters were removed
                               const removedFilters = table.allFilters.filter(
                                 (oldFilter) => {
@@ -694,23 +700,19 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                                   });
                                 },
                               );
-                              
+
                               // For each removed filter, find its group and clear it
                               for (const removedFilter of removedFilters) {
                                 const key = `${removedFilter.field}:${removedFilter.op}:${JSON.stringify('value' in removedFilter ? removedFilter.value : null)}`;
                                 const groupId = table.filterGroupMap.get(key);
                                 if (groupId) {
-                                  console.log(
-                                    '[Table] Clearing filter group:',
-                                    groupId,
-                                  );
                                   this.filterStore.clearFilterGroup(
                                     groupId,
                                     `table-${table.id}`,
                                   );
                                 }
                               }
-                              
+
                               // Determine which filters were added (exist in newFilters but not in allFilters)
                               const addedFilters = newFilters.filter(
                                 (newFilter) => {
@@ -721,15 +723,11 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                                   });
                                 },
                               );
-                              
+
                               // If there are new filters added by the table, create a filter group
                               if (addedFilters.length > 0) {
                                 const d3Filters =
                                   this.convertDataGridFiltersToD3(addedFilters);
-                                console.log(
-                                  '[Table] Adding new filters to FilterStore:',
-                                  d3Filters,
-                                );
                                 this.filterStore.setFilterGroup(
                                   {
                                     id: `table-${table.id}-${Date.now()}`,
@@ -788,6 +786,11 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                     icon: 'close',
                     onclick: () => {
                       this.sidebarOpen = false;
+                      // Trigger chart re-render after sidebar closes to fill new space
+                      setTimeout(() => {
+                        this.charts.forEach((chart) => chart.refresh());
+                        m.redraw();
+                      }, 300); // Wait for CSS transition
                     },
                   }),
                 ],
@@ -1248,6 +1251,11 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
             {
               onclick: () => {
                 this.sidebarOpen = true;
+                // Trigger chart re-render after sidebar opens
+                setTimeout(() => {
+                  this.charts.forEach((chart) => chart.refresh());
+                  m.redraw();
+                }, 300);
               },
               style: {
                 position: 'fixed',
