@@ -14,6 +14,7 @@
 
 import * as d3 from 'd3';
 import {Row, ChartSpec, Filter} from '../data/types';
+import {DataSource} from '../data/source';
 import {BrushBehavior, BrushScales} from './brushing';
 import {SelectionStrategy, FilterSelectionStrategy} from './selection';
 
@@ -24,6 +25,12 @@ export interface ChartRenderer {
     val: string | number | boolean | string[] | number[] | null,
   ) => void;
   render(svg: SVGElement, data: Row[], spec: ChartSpec): void;
+  renderWithSource?(
+    svg: SVGElement,
+    source: DataSource,
+    filters: Filter[],
+    spec: ChartSpec,
+  ): Promise<void>;
   destroy?(svg: SVGElement): void;
 }
 

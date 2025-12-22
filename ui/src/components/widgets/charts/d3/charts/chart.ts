@@ -227,7 +227,17 @@ export class Chart {
       renderer.setSelectionStrategy(strategy);
     }
 
-    renderer.render(svg, this.data, this.spec);
+    // Use renderWithSource if available, otherwise fall back to render
+    if (renderer.renderWithSource) {
+      renderer.renderWithSource(
+        svg,
+        this.source,
+        this.currentFilters,
+        this.spec,
+      );
+    } else {
+      renderer.render(svg, this.data, this.spec);
+    }
   }
 
   /**

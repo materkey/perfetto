@@ -14,7 +14,8 @@
 
 import * as d3 from 'd3';
 import {BaseRenderer} from './base_renderer';
-import {Row, ChartSpec} from '../data/types';
+import {Row, ChartSpec, Filter, Aggregation} from '../data/types';
+import {DataSource} from '../data/source';
 import {formatNumber} from '../utils';
 
 interface PieArcDatum extends d3.PieArcDatum<Row> {
@@ -23,6 +24,26 @@ interface PieArcDatum extends d3.PieArcDatum<Row> {
 
 export class DonutChartRenderer extends BaseRenderer {
   private selectedSlices = new Set<string>();
+
+  async renderWithSource(
+    svg: SVGElement,
+    source: DataSource,
+    filters: Filter[],
+    spec: ChartSpec,
+  ): Promise<void> {
+    if (spec.type !== 'donut') return;
+
+    // Query data with filters and aggregation
+    const aggregation: Aggregation = {
+      fn: spec.aggregation,
+      field: spec.value,
+      groupBy: [spec.category],
+    };
+    const data = await source.query(filters, aggregation);
+
+    // Delegate to existing render logic
+    this.render(svg, data, spec);
+  }
 
   render(svg: SVGElement, data: Row[], spec: ChartSpec) {
     if (spec.type !== 'donut') return;

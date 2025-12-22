@@ -14,12 +14,28 @@
 
 import * as d3 from 'd3';
 import {BaseRenderer} from './base_renderer';
-import {Row, ChartSpec} from '../data/types';
+import {Row, ChartSpec, Filter} from '../data/types';
+import {DataSource} from '../data/source';
 import {formatNumber} from '../utils';
 import {SelectionClipPaths} from './selection_clip_paths';
 
 export class LineRenderer extends BaseRenderer {
   private clipPaths: SelectionClipPaths | null = null;
+
+  async renderWithSource(
+    svg: SVGElement,
+    source: DataSource,
+    filters: Filter[],
+    spec: ChartSpec,
+  ): Promise<void> {
+    if (spec.type !== 'line') return;
+
+    // Query data with filters (no aggregation needed for line chart)
+    const data = await source.query(filters);
+
+    // Delegate to existing render logic
+    this.render(svg, data, spec);
+  }
 
   render(svg: SVGElement, data: Row[], spec: ChartSpec) {
     if (spec.type !== 'line') return;

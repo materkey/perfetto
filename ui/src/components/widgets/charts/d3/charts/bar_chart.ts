@@ -14,7 +14,8 @@
 
 import * as d3 from 'd3';
 import {BaseRenderer} from './base_renderer';
-import {Row, ChartSpec} from '../data/types';
+import {Row, ChartSpec, Filter, Aggregation} from '../data/types';
+import {DataSource} from '../data/source';
 import {formatNumber} from '../utils';
 import {CategoricalBrush} from './brushing';
 
@@ -22,6 +23,22 @@ export class BarChartRenderer extends BaseRenderer {
   constructor() {
     super();
     this.brushBehavior = new CategoricalBrush();
+  }
+
+  async renderWithSource(
+    svg: SVGElement,
+    source: DataSource,
+    filters: Filter[],
+    spec: ChartSpec,
+  ): Promise<void> {
+    if (spec.type !== 'bar') return;
+
+    // Query data with filters and aggregation
+    const aggregation = this.getAggregation(spec);
+    const data = await source.query(filters, aggregation);
+
+    // Delegate to existing render logic
+    this.render(svg, data, spec);
   }
 
   render(svg: SVGElement, data: Row[], spec: ChartSpec) {
@@ -56,6 +73,20 @@ export class BarChartRenderer extends BaseRenderer {
     } else {
       this.renderSimple(svg, g, data, spec, width, height);
     }
+  }
+
+  private getAggregation(spec: ChartSpec): Aggregation | undefined {
+    if (spec.type !== 'bar') return undefined;
+
+    const groupBy = [spec.x];
+    if (spec.groupBy) {
+      groupBy.push(spec.groupBy);
+    }
+    return {
+      fn: spec.aggregation,
+      field: spec.y,
+      groupBy,
+    };
   }
 
   private renderSimple(
