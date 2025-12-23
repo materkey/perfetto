@@ -125,131 +125,135 @@ class BigTraceApp implements m.ClassComponent {
       },
       [
         // Left Sidebar (only render when visible)
-        this.sidebarVisible && m(
-          'nav.pf-sidebar',
-          {
-            style: {
-              width: '250px',
-              flexShrink: 0,
-            },
-          },
-          [
-            m(
-              'header',
-              {
-                style: {
-                  padding: '16px',
-                  borderBottom: '1px solid var(--pf-color-border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                },
+        this.sidebarVisible &&
+          m(
+            'nav.pf-sidebar',
+            {
+              style: {
+                width: '250px',
+                flexShrink: 0,
               },
-              [
-                m('h1', {style: {margin: 0, fontSize: '18px'}}, 'BigTrace'),
-                m(Button, {
-                  icon: 'menu',
-                  onclick: () => {
-                    this.sidebarVisible = !this.sidebarVisible;
+            },
+            [
+              m(
+                'header',
+                {
+                  style: {
+                    padding: '16px',
+                    borderBottom: '1px solid var(--pf-color-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   },
-                }),
-              ],
-            ),
-            m(
-              '.pf-sidebar__scroll',
-              m('.pf-sidebar__scroll-container', [
-                // BigTrace Section
-                m('section.pf-sidebar__section--expanded', [
-                  m(
-                    '.pf-sidebar__section-header',
-                    m('h1', {title: 'BigTrace'}, 'BigTrace'),
-                  ),
-                  m('.pf-sidebar__section-content', [
-                    m('ul', [
-                      m(
-                        'li',
+                },
+                [
+                  m('h1', {style: {margin: 0, fontSize: '18px'}}, 'BigTrace'),
+                  m(Button, {
+                    icon: 'menu',
+                    onclick: () => {
+                      this.sidebarVisible = !this.sidebarVisible;
+                    },
+                  }),
+                ],
+              ),
+              m(
+                '.pf-sidebar__scroll',
+                m('.pf-sidebar__scroll-container', [
+                  // BigTrace Section
+                  m('section.pf-sidebar__section--expanded', [
+                    m(
+                      '.pf-sidebar__section-header',
+                      m('h1', {title: 'BigTrace'}, 'BigTrace'),
+                    ),
+                    m('.pf-sidebar__section-content', [
+                      m('ul', [
                         m(
-                          'a',
-                          {
-                            class:
-                              this.currentPage === 'bigtrace' ? 'active' : '',
-                            onclick: () => {
-                              this.currentPage = 'bigtrace';
+                          'li',
+                          m(
+                            'a',
+                            {
+                              class:
+                                this.currentPage === 'bigtrace' ? 'active' : '',
+                              onclick: () => {
+                                this.currentPage = 'bigtrace';
+                              },
+                              href: '#',
                             },
-                            href: '#',
-                          },
-                          [m(Icon, {icon: 'line_style'}), 'Query Editor'],
+                            [m(Icon, {icon: 'line_style'}), 'Query Editor'],
+                          ),
                         ),
-                      ),
+                      ]),
+                    ]),
+                  ]),
+                  // Metrics Section
+                  m('section.pf-sidebar__section--expanded', [
+                    m(
+                      '.pf-sidebar__section-header',
+                      m('h1', {title: 'Metrics'}, 'Metrics'),
+                    ),
+                    m('.pf-sidebar__section-content', [
+                      m('ul', [
+                        m(
+                          'li',
+                          m(
+                            'a',
+                            {
+                              class:
+                                this.currentPage === 'android_anr'
+                                  ? 'active'
+                                  : '',
+                              onclick: () => {
+                                this.currentPage = 'android_anr';
+                              },
+                              href: '#',
+                            },
+                            [m(Icon, {icon: 'warning'}), 'Android ANR'],
+                          ),
+                        ),
+                        m(
+                          'li',
+                          m(
+                            'a',
+                            {
+                              class:
+                                this.currentPage === 'android_jank'
+                                  ? 'active'
+                                  : '',
+                              onclick: () => {
+                                this.currentPage = 'android_jank';
+                              },
+                              href: '#',
+                            },
+                            [m(Icon, {icon: 'speed'}), 'Android Jank'],
+                          ),
+                        ),
+                        m(
+                          'li',
+                          m(
+                            'a',
+                            {
+                              class:
+                                this.currentPage === 'android_startup'
+                                  ? 'active'
+                                  : '',
+                              onclick: () => {
+                                this.currentPage = 'android_startup';
+                              },
+                              href: '#',
+                            },
+                            [
+                              m(Icon, {icon: 'rocket_launch'}),
+                              'Android Startup',
+                            ],
+                          ),
+                        ),
+                      ]),
                     ]),
                   ]),
                 ]),
-                // Metrics Section
-                m('section.pf-sidebar__section--expanded', [
-                  m(
-                    '.pf-sidebar__section-header',
-                    m('h1', {title: 'Metrics'}, 'Metrics'),
-                  ),
-                  m('.pf-sidebar__section-content', [
-                    m('ul', [
-                      m(
-                        'li',
-                        m(
-                          'a',
-                          {
-                            class:
-                              this.currentPage === 'android_anr'
-                                ? 'active'
-                                : '',
-                            onclick: () => {
-                              this.currentPage = 'android_anr';
-                            },
-                            href: '#',
-                          },
-                          [m(Icon, {icon: 'warning'}), 'Android ANR'],
-                        ),
-                      ),
-                      m(
-                        'li',
-                        m(
-                          'a',
-                          {
-                            class:
-                              this.currentPage === 'android_jank'
-                                ? 'active'
-                                : '',
-                            onclick: () => {
-                              this.currentPage = 'android_jank';
-                            },
-                            href: '#',
-                          },
-                          [m(Icon, {icon: 'speed'}), 'Android Jank'],
-                        ),
-                      ),
-                      m(
-                        'li',
-                        m(
-                          'a',
-                          {
-                            class:
-                              this.currentPage === 'android_startup'
-                                ? 'active'
-                                : '',
-                            onclick: () => {
-                              this.currentPage = 'android_startup';
-                            },
-                            href: '#',
-                          },
-                          [m(Icon, {icon: 'rocket_launch'}), 'Android Startup'],
-                        ),
-                      ),
-                    ]),
-                  ]),
-                ]),
-              ]),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
 
         // Main content - D3ChartsPage
         m(

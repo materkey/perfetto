@@ -13,15 +13,20 @@
 // limitations under the License.
 
 import {DataSource} from '../../widgets/charts/d3/data/source';
+import {MemorySource} from '../../widgets/charts/d3/data/memory_source';
 import {Aggregation, Filter, Row} from '../../widgets/charts/d3/data/types';
 
 /**
  * DataSource implementation that queries the Brush backend API.
+ * Currently fetches all data once and applies filters/aggregations in-memory.
+ * This makes it easy to switch to server-side filtering when backend support is added.
  */
 export class D3ChartBrushSource implements DataSource {
   private baseQuery: string;
   private traceAddress: string;
   private limit: number;
+  private cachedData: Row[] | null = null;
+  private fetchPromise: Promise<Row[]> | null = null;
 
   constructor(
     baseQuery: string,
@@ -33,91 +38,49 @@ export class D3ChartBrushSource implements DataSource {
     this.limit = limit;
   }
 
-  async query(filters: Filter[], _aggregation?: Aggregation): Promise<Row[]> {
-    // Build the SQL query with filters
-    let query = this.baseQuery;
-
-    // Remove any existing LIMIT clause first to add it at the end
-    const limitMatch = query.match(/\bLIMIT\s+\d+/i);
-    const existingLimit = limitMatch ? limitMatch[0] : null;
-    if (existingLimit) {
-      query = query.replace(/\bLIMIT\s+\d+/i, '').trim();
+  /**
+   * Fetches data from the Brush backend API.
+   * Results are cached to avoid redundant network calls.
+   * @param forceRefresh If true, bypasses cache and fetches fresh data
+   */
+  private async fetchData(forceRefresh = false): Promise<Row[]> {
+    // Clear cache if refresh is requested
+    if (forceRefresh) {
+      this.cachedData = null;
+      this.fetchPromise = null;
     }
 
-    // Add WHERE clause if filters exist
-    if (filters.length > 0) {
-      const whereConditions = filters.map((f) => {
-        if (f.val === null) {
-          // Null value filters - treat as IS NULL
-          return `${f.col} IS NULL`;
-        }
-
-        switch (f.op) {
-          case '=':
-            return typeof f.val === 'string'
-              ? `${f.col} = '${f.val}'`
-              : `${f.col} = ${f.val}`;
-          case '!=':
-            return typeof f.val === 'string'
-              ? `${f.col} != '${f.val}'`
-              : `${f.col} != ${f.val}`;
-          case '>':
-            return `${f.col} > ${f.val}`;
-          case '>=':
-            return `${f.col} >= ${f.val}`;
-          case '<':
-            return `${f.col} < ${f.val}`;
-          case '<=':
-            return `${f.col} <= ${f.val}`;
-          case 'in':
-            if (Array.isArray(f.val)) {
-              const values = f.val
-                .map((v: string | number) =>
-                  typeof v === 'string' ? `'${v}'` : v,
-                )
-                .join(', ');
-              return `${f.col} IN (${values})`;
-            }
-            return '1=1'; // Invalid filter, ignore
-          case 'not in':
-            if (Array.isArray(f.val)) {
-              const values = f.val
-                .map((v: string | number) =>
-                  typeof v === 'string' ? `'${v}'` : v,
-                )
-                .join(', ');
-              return `${f.col} NOT IN (${values})`;
-            }
-            return '1=1'; // Invalid filter, ignore
-          case 'glob':
-            return `${f.col} GLOB '${f.val}'`;
-          default:
-            return '1=1'; // Unknown operator, ignore
-        }
-      });
-
-      // Check if the query already has a WHERE clause
-      const hasWhere = /\bWHERE\b/i.test(query);
-      if (hasWhere) {
-        query += ` AND (${whereConditions.join(' AND ')})`;
-      } else {
-        query += ` WHERE ${whereConditions.join(' AND ')}`;
-      }
+    // Return cached data if available
+    if (this.cachedData !== null) {
+      return this.cachedData;
     }
 
-    // Add LIMIT at the end (use existing limit if found, otherwise use default)
-    if (existingLimit) {
-      query += ` ${existingLimit}`;
-    } else {
-      query += ` LIMIT ${this.limit}`;
+    // If a fetch is already in progress, wait for it
+    if (this.fetchPromise !== null) {
+      return this.fetchPromise;
     }
 
-    // Send query to Brush backend
+    // Start a new fetch
+    this.fetchPromise = this.performFetch();
+    try {
+      this.cachedData = await this.fetchPromise;
+      return this.cachedData;
+    } finally {
+      this.fetchPromise = null;
+    }
+  }
+
+  /**
+   * Performs the actual HTTP request to the Brush backend.
+   */
+  private async performFetch(): Promise<Row[]> {
     const url = 'https://brush-googleapis.corp.google.com/v1/bigtrace/query';
+
+    // Construct the JSON payload matching the QueryRequest proto structure
     const data = {
-      perfetto_sql: query,
       trace_address: this.traceAddress,
       limit: this.limit,
+      perfetto_sql: this.baseQuery,
     };
 
     try {
@@ -150,8 +113,12 @@ export class D3ChartBrushSource implements DataSource {
             result.columnNames.forEach((header: string, index: number) => {
               if (header === null) return;
               const value = row.values[index];
+              // Attempt to convert to number, keep as string if NaN
               const numValue = Number(value);
-              rowObject[header] = isNaN(numValue) ? value : numValue;
+              rowObject[header] =
+                value === null || value === 'NULL' || isNaN(numValue)
+                  ? value
+                  : numValue;
             });
             return rowObject;
           },
@@ -163,5 +130,35 @@ export class D3ChartBrushSource implements DataSource {
       console.error('Brush query error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Query method that fetches data and applies filters/aggregations in-memory.
+   * When backend filter support is added, replace the in-memory filtering
+   * with server-side filtering by passing filters to the API.
+   * @param filters Filters to apply to the data
+   * @param aggregation Aggregation to apply
+   * @param forceRefresh If true, bypasses cache and fetches fresh data from backend
+   */
+  async query(
+    filters: Filter[],
+    aggregation?: Aggregation,
+    forceRefresh = false,
+  ): Promise<Row[]> {
+    // Fetch all data (cached after first call unless forceRefresh is true)
+    const allData = await this.fetchData(forceRefresh);
+
+    // Use MemorySource to apply filters and aggregations
+    // This ensures consistent behavior with other data sources
+    const memorySource = new MemorySource(allData);
+    return memorySource.query(filters, aggregation);
+  }
+
+  /**
+   * Clears the cached data, forcing a fresh fetch on the next query.
+   */
+  clearCache(): void {
+    this.cachedData = null;
+    this.fetchPromise = null;
   }
 }

@@ -48,7 +48,7 @@ const DEFAULT_SQL = `SELECT
   ts,
   id
 FROM slice
-LIMIT 10000`;
+LIMIT 1000`;
 
 // Chart creator state
 interface ChartCreatorState {
@@ -91,6 +91,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
   private sidebarOpen = false;
   private nextTableId = 0;
   private isLoading = false;
+  private limit = 1000;
 
   // Chart creator state
   private chartCreator: ChartCreatorState = {
@@ -134,7 +135,7 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
         this.dataSource = new D3ChartBrushSource(
           this.sqlQuery,
           'android_telemetry.field_trace_summaries_prod.last30days',
-          10000,
+          this.limit,
         );
 
         // Fetch a sample row to get available columns
@@ -527,18 +528,19 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
       },
       [
         // Global loading indicator - thin blue line at the very top
-        this.isLoading && m('.loading-indicator', {
-          style: {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            background: 'var(--pf-color-accent)',
-            zIndex: 10000,
-            animation: 'loading-pulse 1.5s ease-in-out infinite',
-          },
-        }),
+        this.isLoading &&
+          m('.loading-indicator', {
+            style: {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '3px',
+              background: 'var(--pf-color-accent)',
+              zIndex: 10000,
+              animation: 'loading-pulse 1.5s ease-in-out infinite',
+            },
+          }),
         // Main content area
         m(
           '.main-content',
@@ -579,12 +581,30 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                     },
                     [
                       // Hamburger button (only show if sidebar toggle callback provided and sidebar is hidden)
-                      attrs.onToggleSidebar && attrs.sidebarVisible === false &&
+                      attrs.onToggleSidebar &&
+                        attrs.sidebarVisible === false &&
                         m(Button, {
                           icon: 'menu',
                           onclick: attrs.onToggleSidebar,
                           style: {
                             fontSize: '24px',
+                          },
+                        }),
+                      this.useBrushBackend &&
+                        m('input.pf-text-input[type=number]', {
+                          value: this.limit,
+                          placeholder: 'Limit',
+                          style: {
+                            width: '100px',
+                          },
+                          onchange: (e: Event) => {
+                            const newLimit = parseInt(
+                              (e.target as HTMLInputElement).value,
+                              10,
+                            );
+                            if (!isNaN(newLimit) && newLimit > 0) {
+                              this.limit = newLimit;
+                            }
                           },
                         }),
                       m(Button, {
