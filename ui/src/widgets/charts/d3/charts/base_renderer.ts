@@ -171,6 +171,142 @@ export abstract class BaseRenderer implements ChartRenderer {
     }
   }
 
+  /**
+   * Add crosshairs that follow the mouse cursor with tooltip showing values.
+   * This creates the visual elements (lines and dots) but returns handlers for the overlay.
+   * The overlay should be added AFTER the brush to ensure both work together.
+   * @param g - The SVG group element
+   * @param width - The chart width
+   * @param height - The chart height
+   * @param getTooltipContent - Function to generate tooltip HTML based on mouse position
+   * @param getDotPositions - Optional function to get positions and colors for dots on the lines
+   * @returns Object with methods to attach the overlay later
+   */
+  protected addCrosshairs(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    width: number,
+    height: number,
+    getTooltipContent: (mouseX: number, mouseY: number) => string | null,
+    getDotPositions?: (
+      mouseX: number,
+      mouseY: number,
+    ) => Array<{x: number; y: number; color: string}>,
+  ): {attachOverlay: () => void} {
+    // Create crosshair group (visual elements only, no overlay yet)
+    const crosshairGroup = g
+      .append('g')
+      .attr('class', 'crosshair')
+      .style('display', 'none')
+      .style('pointer-events', 'none');
+
+    // Vertical line
+    crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-vertical')
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    // Horizontal line
+    crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-horizontal')
+      .attr('x1', 0)
+      .attr('x2', width)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    // Group for dots on the lines
+    const dotsGroup = crosshairGroup
+      .append('g')
+      .attr('class', 'crosshair-dots');
+
+    // Create tooltip
+    const tooltip = d3
+      .select('body')
+      .selectAll<HTMLDivElement, null>('.chart-crosshair-tooltip')
+      .data([null])
+      .join('div')
+      .attr('class', 'chart-crosshair-tooltip')
+      .style('position', 'absolute')
+      .style('visibility', 'hidden')
+      .style('background', 'rgba(0, 0, 0, 0.9)')
+      .style('color', 'white')
+      .style('padding', '8px 12px')
+      .style('border-radius', '4px')
+      .style('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('z-index', '1000')
+      .style('white-space', 'nowrap');
+
+    // Return a function to attach the overlay later (after brush is added)
+    return {
+      attachOverlay: () => {
+        // Create invisible overlay for mouse tracking - added AFTER brush
+        const overlay = g
+          .append('rect')
+          .attr('class', 'crosshair-overlay')
+          .attr('width', width)
+          .attr('height', height)
+          .style('fill', 'none')
+          .style('pointer-events', 'all');
+
+        overlay
+          .on('mousemove', (event: MouseEvent) => {
+            const [mouseX, mouseY] = d3.pointer(event);
+
+            // Show crosshairs
+            crosshairGroup.style('display', null);
+            crosshairGroup
+              .select('.crosshair-vertical')
+              .attr('x1', mouseX)
+              .attr('x2', mouseX);
+            crosshairGroup
+              .select('.crosshair-horizontal')
+              .attr('y1', mouseY)
+              .attr('y2', mouseY);
+
+            // Update dots if getDotPositions is provided
+            if (getDotPositions) {
+              const dotPositions = getDotPositions(mouseX, mouseY);
+              dotsGroup
+                .selectAll<
+                  SVGCircleElement,
+                  {x: number; y: number; color: string}
+                >('circle')
+                .data(dotPositions)
+                .join('circle')
+                .attr('cx', (d) => d.x)
+                .attr('cy', (d) => d.y)
+                .attr('r', 4)
+                .attr('fill', (d) => d.color)
+                .attr('stroke', 'white')
+                .attr('stroke-width', 2);
+            }
+
+            // Get tooltip content
+            const content = getTooltipContent(mouseX, mouseY);
+            if (content) {
+              tooltip
+                .style('visibility', 'visible')
+                .html(content)
+                .style('left', `${event.pageX + 15}px`)
+                .style('top', `${event.pageY - 10}px`);
+            } else {
+              tooltip.style('visibility', 'hidden');
+            }
+          })
+          .on('mouseout', () => {
+            crosshairGroup.style('display', 'none');
+            tooltip.style('visibility', 'hidden');
+          });
+      },
+    };
+  }
+
   protected setupBrush(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     data: Row[],

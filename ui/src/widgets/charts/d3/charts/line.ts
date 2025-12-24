@@ -113,7 +113,7 @@ export class LineRenderer extends BaseRenderer {
       .x((d) => x(d.x))
       .y((d) => y(d.y));
 
-    // Setup brush with clip path highlighting BEFORE drawing line
+    // Setup brush with clip path highlighting
     this.setupLineBrush(
       g,
       sortedPoints,
@@ -125,7 +125,52 @@ export class LineRenderer extends BaseRenderer {
       line,
     );
 
-    // Draw line with pointer-events: none
+    // Create crosshair elements (hidden by default)
+    const crosshairGroup = g
+      .append('g')
+      .attr('class', 'crosshair')
+      .style('display', 'none')
+      .style('pointer-events', 'none');
+
+    crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-vertical')
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    const horizontalLine = crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-horizontal')
+      .attr('x1', 0)
+      .attr('x2', width)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    crosshairGroup
+      .append('circle')
+      .attr('class', 'crosshair-dot')
+      .attr('r', 4)
+      .attr('fill', 'steelblue')
+      .attr('stroke', 'white')
+      .attr('stroke-width', 2);
+
+    // Invisible thick line for mouse events
+    const linePath = g
+      .append('path')
+      .datum(sortedPoints)
+      .attr('class', 'line-path-hover')
+      .attr('fill', 'none')
+      .attr('stroke', 'transparent')
+      .attr('stroke-width', '10px')
+      .attr('d', line)
+      .style('pointer-events', 'stroke')
+      .style('cursor', 'crosshair');
+
+    // Visible line on top
     g.append('path')
       .datum(sortedPoints)
       .attr('class', 'line-path')
@@ -134,6 +179,71 @@ export class LineRenderer extends BaseRenderer {
       .attr('stroke-width', 2)
       .attr('d', line)
       .style('pointer-events', 'none');
+
+    // Create tooltip
+    const tooltip = d3
+      .select('body')
+      .selectAll<HTMLDivElement, null>('.chart-tooltip')
+      .data([null])
+      .join('div')
+      .attr('class', 'chart-tooltip')
+      .style('position', 'absolute')
+      .style('visibility', 'hidden')
+      .style('background', 'rgba(0, 0, 0, 0.8)')
+      .style('color', 'white')
+      .style('padding', '8px')
+      .style('border-radius', '4px')
+      .style('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('z-index', '1000');
+
+    // Setup tooltip and crosshairs on the invisible thick line
+    linePath
+      .on('mouseover', () => {
+        tooltip.style('visibility', 'visible');
+        crosshairGroup.style('display', null);
+      })
+      .on('mousemove', (event: MouseEvent) => {
+        const [mouseX] = d3.pointer(event);
+        const xValue = x.invert(mouseX);
+
+        // Find closest point
+        let closestPoint = sortedPoints[0];
+        let minDist = Math.abs(sortedPoints[0].x - xValue);
+
+        for (const point of sortedPoints) {
+          const dist = Math.abs(point.x - xValue);
+          if (dist < minDist) {
+            minDist = dist;
+            closestPoint = point;
+          }
+        }
+
+        const dotX = x(closestPoint.x);
+        const dotY = y(closestPoint.y);
+
+        // Update crosshairs - both at data point
+        crosshairGroup
+          .select('.crosshair-vertical')
+          .attr('x1', dotX)
+          .attr('x2', dotX);
+        horizontalLine.attr('y1', dotY).attr('y2', dotY);
+        crosshairGroup
+          .select('.crosshair-dot')
+          .attr('cx', dotX)
+          .attr('cy', dotY);
+
+        tooltip
+          .html(
+            `<strong>${spec.x}:</strong> ${formatNumber(closestPoint.x)}<br/><strong>${spec.y}:</strong> ${formatNumber(closestPoint.y)}`,
+          )
+          .style('left', `${event.pageX + 10}px`)
+          .style('top', `${event.pageY - 10}px`);
+      })
+      .on('mouseout', () => {
+        tooltip.style('visibility', 'hidden');
+        crosshairGroup.style('display', 'none');
+      });
 
     // Axes
     g.append('g')
@@ -210,7 +320,7 @@ export class LineRenderer extends BaseRenderer {
       .x((d) => x(d.x))
       .y((d) => y(d.y));
 
-    // Setup brush BEFORE drawing lines
+    // Setup brush
     this.setupColoredLineBrush(
       g,
       points,
@@ -223,10 +333,64 @@ export class LineRenderer extends BaseRenderer {
       colorScale,
     );
 
-    // Draw lines for each category with pointer-events: none
+    // Create crosshair elements (hidden by default)
+    const crosshairGroup = g
+      .append('g')
+      .attr('class', 'crosshair')
+      .style('display', 'none')
+      .style('pointer-events', 'none');
+
+    crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-vertical')
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    const horizontalLinesGroup = crosshairGroup
+      .append('g')
+      .attr('class', 'crosshair-horizontals');
+
+    const dotsGroup = crosshairGroup
+      .append('g')
+      .attr('class', 'crosshair-dots');
+
+    // Create tooltip
+    const tooltip = d3
+      .select('body')
+      .selectAll<HTMLDivElement, null>('.chart-tooltip')
+      .data([null])
+      .join('div')
+      .attr('class', 'chart-tooltip')
+      .style('position', 'absolute')
+      .style('visibility', 'hidden')
+      .style('background', 'rgba(0, 0, 0, 0.8)')
+      .style('color', 'white')
+      .style('padding', '8px')
+      .style('border-radius', '4px')
+      .style('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('z-index', '1000');
+
+    // Draw lines for each category with tooltips
     grouped.forEach((groupPoints, category) => {
       const sortedPoints = groupPoints.sort((a, b) => a.x - b.x);
 
+      // Invisible thick line for mouse events
+      const linePath = g
+        .append('path')
+        .datum(sortedPoints)
+        .attr('class', 'line-path-hover')
+        .attr('fill', 'none')
+        .attr('stroke', 'transparent')
+        .attr('stroke-width', '10px')
+        .attr('d', line)
+        .style('pointer-events', 'stroke')
+        .style('cursor', 'crosshair');
+
+      // Visible line on top
       g.append('path')
         .datum(sortedPoints)
         .attr('class', 'line-path')
@@ -240,6 +404,107 @@ export class LineRenderer extends BaseRenderer {
           if (spec.colorBy) {
             this.onFilterRequest?.(spec.colorBy, '=', category);
           }
+        });
+
+      // Setup tooltip and crosshairs showing all series at this x position
+      linePath
+        .on('mouseover', () => {
+          tooltip.style('visibility', 'visible');
+          crosshairGroup.style('display', null);
+        })
+        .on('mousemove', (event: MouseEvent) => {
+          const [mouseX] = d3.pointer(event);
+          const xValue = x.invert(mouseX);
+
+          // Find closest x value across all series
+          const allXValues = Array.from(new Set(points.map((p) => p.x))).sort(
+            (a, b) => a - b,
+          );
+          let closestX = allXValues[0];
+          let minDist = Math.abs(allXValues[0] - xValue);
+
+          for (const xVal of allXValues) {
+            const dist = Math.abs(xVal - xValue);
+            if (dist < minDist) {
+              minDist = dist;
+              closestX = xVal;
+            }
+          }
+
+          // Get values for all categories at this x
+          const valuesAtX: Array<{category: string; y: number}> = [];
+          grouped.forEach((groupPoints, cat) => {
+            const point = groupPoints.find((p) => p.x === closestX);
+            if (point) {
+              valuesAtX.push({category: String(cat), y: point.y});
+            }
+          });
+
+          if (valuesAtX.length === 0) return;
+
+          // Update vertical crosshair at data point
+          const crosshairX = x(closestX);
+          crosshairGroup
+            .select('.crosshair-vertical')
+            .attr('x1', crosshairX)
+            .attr('x2', crosshairX);
+
+          // Update horizontal lines for each series
+          const horizontalLineData = valuesAtX.map(
+            ({category: cat, y: yVal}) => ({
+              y: y(yVal),
+              color: colorScale(cat),
+            }),
+          );
+
+          horizontalLinesGroup
+            .selectAll<SVGLineElement, {y: number; color: string}>('line')
+            .data(horizontalLineData)
+            .join('line')
+            .attr('x1', 0)
+            .attr('x2', width)
+            .attr('y1', (d) => d.y)
+            .attr('y2', (d) => d.y)
+            .attr('stroke', (d) => d.color)
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '4,4')
+            .attr('opacity', 0.7);
+
+          // Update dots for all series
+          const dotData = valuesAtX.map(({category: cat, y: yVal}) => ({
+            x: x(closestX),
+            y: y(yVal),
+            color: colorScale(cat),
+          }));
+
+          dotsGroup
+            .selectAll<SVGCircleElement, {x: number; y: number; color: string}>(
+              'circle',
+            )
+            .data(dotData)
+            .join('circle')
+            .attr('cx', (d) => d.x)
+            .attr('cy', (d) => d.y)
+            .attr('r', 4)
+            .attr('fill', (d) => d.color)
+            .attr('stroke', 'white')
+            .attr('stroke-width', 2);
+
+          // Build tooltip HTML
+          let html = `<strong>${spec.x}:</strong> ${formatNumber(closestX)}<br/>`;
+          valuesAtX.forEach(({category: cat, y: yVal}) => {
+            const color = colorScale(cat);
+            html += `<span style="color: ${color}">●</span> <strong>${cat}:</strong> ${formatNumber(yVal)}<br/>`;
+          });
+
+          tooltip
+            .html(html)
+            .style('left', `${event.pageX + 10}px`)
+            .style('top', `${event.pageY - 10}px`);
+        })
+        .on('mouseout', () => {
+          tooltip.style('visibility', 'hidden');
+          crosshairGroup.style('display', 'none');
         });
     });
 

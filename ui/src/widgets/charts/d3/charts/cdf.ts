@@ -120,7 +120,55 @@ export class CDFRenderer extends BaseRenderer {
       .x((d) => x(d.x))
       .y((d) => y(d.y));
 
-    // Draw line - CDF lines are not selectable (they represent cumulative distribution)
+    // Add custom brush with clip path highlighting
+    this.setupCDFBrush(g, cdfPoints, spec, {x, y}, width, height, line);
+
+    // Create crosshair elements (hidden by default)
+    const crosshairGroup = g
+      .append('g')
+      .attr('class', 'crosshair')
+      .style('display', 'none')
+      .style('pointer-events', 'none');
+
+    crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-vertical')
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    const horizontalLine = crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-horizontal')
+      .attr('x1', 0)
+      .attr('x2', width)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    crosshairGroup
+      .append('circle')
+      .attr('class', 'crosshair-dot')
+      .attr('r', 4)
+      .attr('fill', 'steelblue')
+      .attr('stroke', 'white')
+      .attr('stroke-width', 2);
+
+    // Invisible thick line for mouse events
+    const cdfPath = g
+      .append('path')
+      .datum(cdfPoints)
+      .attr('class', 'cdf-line-hover')
+      .attr('fill', 'none')
+      .attr('stroke', 'transparent')
+      .attr('stroke-width', '10px')
+      .attr('d', line)
+      .style('pointer-events', 'stroke')
+      .style('cursor', 'crosshair');
+
+    // Visible CDF line on top
     g.append('path')
       .datum(cdfPoints)
       .attr('class', 'cdf-line')
@@ -130,8 +178,81 @@ export class CDFRenderer extends BaseRenderer {
       .attr('d', line)
       .style('pointer-events', 'none');
 
-    // Add custom brush with clip path highlighting AFTER drawing the line
-    this.setupCDFBrush(g, cdfPoints, spec, {x, y}, width, height, line);
+    // Create tooltip
+    const tooltip = d3
+      .select('body')
+      .selectAll<HTMLDivElement, null>('.chart-tooltip')
+      .data([null])
+      .join('div')
+      .attr('class', 'chart-tooltip')
+      .style('position', 'absolute')
+      .style('visibility', 'hidden')
+      .style('background', 'rgba(0, 0, 0, 0.8)')
+      .style('color', 'white')
+      .style('padding', '8px')
+      .style('border-radius', '4px')
+      .style('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('z-index', '1000');
+
+    // Setup tooltip and crosshairs on the invisible thick line
+    cdfPath
+      .on('mouseover', () => {
+        tooltip.style('visibility', 'visible');
+        crosshairGroup.style('display', null);
+      })
+      .on('mousemove', (event: MouseEvent) => {
+        const [mouseX] = d3.pointer(event);
+        const xValue = x.invert(mouseX);
+
+        // Find the CDF value at this x (interpolate between points)
+        let cdfValue = 0;
+        let interpolatedX = xValue;
+        for (let i = 0; i < cdfPoints.length; i++) {
+          if (cdfPoints[i].x >= xValue) {
+            if (i === 0) {
+              cdfValue = cdfPoints[0].y;
+              interpolatedX = cdfPoints[0].x;
+            } else {
+              // Linear interpolation
+              const p0 = cdfPoints[i - 1];
+              const p1 = cdfPoints[i];
+              const t = (xValue - p0.x) / (p1.x - p0.x);
+              cdfValue = p0.y + t * (p1.y - p0.y);
+            }
+            break;
+          }
+        }
+        if (cdfValue === 0 && cdfPoints.length > 0) {
+          cdfValue = cdfPoints[cdfPoints.length - 1].y;
+          interpolatedX = cdfPoints[cdfPoints.length - 1].x;
+        }
+
+        const dotX = x(interpolatedX);
+        const dotY = y(cdfValue);
+
+        // Update crosshairs - both at data point
+        crosshairGroup
+          .select('.crosshair-vertical')
+          .attr('x1', dotX)
+          .attr('x2', dotX);
+        horizontalLine.attr('y1', dotY).attr('y2', dotY);
+        crosshairGroup
+          .select('.crosshair-dot')
+          .attr('cx', dotX)
+          .attr('cy', dotY);
+
+        tooltip
+          .html(
+            `<strong>${spec.x}:</strong> ${formatNumber(xValue)}<br/><strong>CDF:</strong> ${(cdfValue * 100).toFixed(1)}%`,
+          )
+          .style('left', `${event.pageX + 10}px`)
+          .style('top', `${event.pageY - 10}px`);
+      })
+      .on('mouseout', () => {
+        tooltip.style('visibility', 'hidden');
+        crosshairGroup.style('display', 'none');
+      });
 
     // Axes
     g.append('g')
@@ -208,7 +329,13 @@ export class CDFRenderer extends BaseRenderer {
       .x((d) => x(d.x))
       .y((d) => y(d.y));
 
-    // Draw lines for each category
+    // Store CDF points for each category for tooltip
+    const cdfPointsByCategory = new Map<
+      string,
+      Array<{x: number; y: number}>
+    >();
+
+    // Compute CDF points for each category
     grouped.forEach((groupData, category) => {
       const values = groupData
         .map((d) => Number(d[spec.x]))
@@ -220,23 +347,10 @@ export class CDFRenderer extends BaseRenderer {
         y: (i + 1) / values.length,
       }));
 
-      g.append('path')
-        .datum(cdfPoints)
-        .attr('class', 'cdf-line')
-        .attr('fill', 'none')
-        .attr('stroke', colorScale(String(category)))
-        .attr('stroke-width', 2)
-        .attr('d', line)
-        .style('pointer-events', 'none')
-        .style('cursor', 'pointer')
-        .on('click', () => {
-          if (category !== null && category !== undefined) {
-            this.onFilterRequest?.(spec.colorBy!, '=', category);
-          }
-        });
+      cdfPointsByCategory.set(String(category), cdfPoints);
     });
 
-    // Add custom brush with clip path highlighting for colored CDF AFTER drawing lines
+    // Add custom brush with clip path highlighting
     this.setupColoredCDFBrush(
       g,
       data,
@@ -247,6 +361,186 @@ export class CDFRenderer extends BaseRenderer {
       line,
       colorScale,
     );
+
+    // Create crosshair elements (hidden by default)
+    const crosshairGroup = g
+      .append('g')
+      .attr('class', 'crosshair')
+      .style('display', 'none')
+      .style('pointer-events', 'none');
+
+    crosshairGroup
+      .append('line')
+      .attr('class', 'crosshair-vertical')
+      .attr('y1', 0)
+      .attr('y2', height)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4');
+
+    const horizontalLinesGroup = crosshairGroup
+      .append('g')
+      .attr('class', 'crosshair-horizontals');
+
+    const dotsGroup = crosshairGroup
+      .append('g')
+      .attr('class', 'crosshair-dots');
+
+    // Create tooltip
+    const tooltip = d3
+      .select('body')
+      .selectAll<HTMLDivElement, null>('.chart-tooltip')
+      .data([null])
+      .join('div')
+      .attr('class', 'chart-tooltip')
+      .style('position', 'absolute')
+      .style('visibility', 'hidden')
+      .style('background', 'rgba(0, 0, 0, 0.8)')
+      .style('color', 'white')
+      .style('padding', '8px')
+      .style('border-radius', '4px')
+      .style('font-size', '12px')
+      .style('pointer-events', 'none')
+      .style('z-index', '1000');
+
+    // Draw lines for each category with tooltips
+    cdfPointsByCategory.forEach((cdfPoints, category) => {
+      // Invisible thick line for mouse events
+      const cdfPath = g
+        .append('path')
+        .datum(cdfPoints)
+        .attr('class', 'cdf-line-hover')
+        .attr('fill', 'none')
+        .attr('stroke', 'transparent')
+        .attr('stroke-width', '10px')
+        .attr('d', line)
+        .style('pointer-events', 'stroke')
+        .style('cursor', 'crosshair');
+
+      // Visible CDF line on top
+      g.append('path')
+        .datum(cdfPoints)
+        .attr('class', 'cdf-line')
+        .attr('fill', 'none')
+        .attr('stroke', colorScale(category))
+        .attr('stroke-width', 2)
+        .attr('d', line)
+        .style('pointer-events', 'none')
+        .style('cursor', 'pointer')
+        .on('click', () => {
+          if (category !== null && category !== undefined) {
+            this.onFilterRequest?.(spec.colorBy!, '=', category);
+          }
+        });
+
+      // Setup tooltip and crosshairs showing all series at this x position
+      cdfPath
+        .on('mouseover', () => {
+          tooltip.style('visibility', 'visible');
+          crosshairGroup.style('display', null);
+        })
+        .on('mousemove', (event: MouseEvent) => {
+          const [mouseX] = d3.pointer(event);
+          const xValue = x.invert(mouseX);
+
+          // Get CDF values for all categories at this x
+          const valuesAtX: Array<{
+            category: string;
+            cdf: number;
+            interpolatedX: number;
+          }> = [];
+
+          cdfPointsByCategory.forEach((points, cat) => {
+            let cdfValue = 0;
+            let interpolatedX = xValue;
+            for (let i = 0; i < points.length; i++) {
+              if (points[i].x >= xValue) {
+                if (i === 0) {
+                  cdfValue = points[0].y;
+                  interpolatedX = points[0].x;
+                } else {
+                  // Linear interpolation
+                  const p0 = points[i - 1];
+                  const p1 = points[i];
+                  const t = (xValue - p0.x) / (p1.x - p0.x);
+                  cdfValue = p0.y + t * (p1.y - p0.y);
+                }
+                break;
+              }
+            }
+            if (cdfValue === 0 && points.length > 0) {
+              cdfValue = points[points.length - 1].y;
+              interpolatedX = points[points.length - 1].x;
+            }
+
+            valuesAtX.push({category: cat, cdf: cdfValue, interpolatedX});
+          });
+
+          if (valuesAtX.length === 0) return;
+
+          // Update vertical crosshair at data point
+          const crosshairX = x(xValue);
+          crosshairGroup
+            .select('.crosshair-vertical')
+            .attr('x1', crosshairX)
+            .attr('x2', crosshairX);
+
+          // Update horizontal lines for each series
+          const horizontalLineData = valuesAtX.map(({category: cat, cdf}) => ({
+            y: y(cdf),
+            color: colorScale(cat),
+          }));
+
+          horizontalLinesGroup
+            .selectAll<SVGLineElement, {y: number; color: string}>('line')
+            .data(horizontalLineData)
+            .join('line')
+            .attr('x1', 0)
+            .attr('x2', width)
+            .attr('y1', (d) => d.y)
+            .attr('y2', (d) => d.y)
+            .attr('stroke', (d) => d.color)
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '4,4')
+            .attr('opacity', 0.7);
+
+          // Update dots for all series
+          const dotData = valuesAtX.map(({category: cat, cdf}) => ({
+            x: x(xValue),
+            y: y(cdf),
+            color: colorScale(cat),
+          }));
+
+          dotsGroup
+            .selectAll<SVGCircleElement, {x: number; y: number; color: string}>(
+              'circle',
+            )
+            .data(dotData)
+            .join('circle')
+            .attr('cx', (d) => d.x)
+            .attr('cy', (d) => d.y)
+            .attr('r', 4)
+            .attr('fill', (d) => d.color)
+            .attr('stroke', 'white')
+            .attr('stroke-width', 2);
+
+          // Build tooltip HTML
+          let html = `<strong>${spec.x}:</strong> ${formatNumber(xValue)}<br/>`;
+          valuesAtX.forEach(({category: cat, cdf}) => {
+            const color = colorScale(cat);
+            html += `<span style="color: ${color}">●</span> <strong>${cat}:</strong> ${(cdf * 100).toFixed(1)}%<br/>`;
+          });
+
+          tooltip
+            .html(html)
+            .style('left', `${event.pageX + 10}px`)
+            .style('top', `${event.pageY - 10}px`);
+        })
+        .on('mouseout', () => {
+          tooltip.style('visibility', 'hidden');
+          crosshairGroup.style('display', 'none');
+        });
+    });
 
     // Axes
     g.append('g')
