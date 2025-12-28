@@ -1081,7 +1081,7 @@ class TraceStorage {
   }
 
   std::optional<Variadic::Type> GetVariadicTypeForId(StringId id) const {
-    const auto* it =
+    auto it =
         std::find(variadic_type_ids_.begin(), variadic_type_ids_.end(), id);
     if (it == variadic_type_ids_.end())
       return std::nullopt;
