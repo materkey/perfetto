@@ -26,6 +26,7 @@ export interface SelectionContext {
     op: Filter['op'],
     val: string | number | boolean | string[] | number[] | null,
   ) => void;
+  updateSourceFilter?: boolean;
 }
 
 /**

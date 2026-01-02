@@ -175,7 +175,7 @@ export class BoxplotRenderer extends BaseRenderer {
       .attr('class', 'boxplot-group')
       .attr('transform', (d) => `translate(${x(d.category)}, 0)`)
       .style('opacity', opacity)
-      .style('pointer-events', 'none');
+      .style('pointer-events', 'all');
 
     // Lower whisker line (from min to Q1)
     boxGroups

@@ -131,7 +131,15 @@ export class BarChartRenderer extends BaseRenderer {
       .on('click', (_event, d) => {
         const value = d[spec.x];
         if (value !== undefined && value !== null) {
-          this.onFilterRequest?.(spec.x, '=', value);
+          this.selectionStrategy.onSelection(
+            [d],
+            [{col: spec.x, op: '=', val: value}],
+            {
+              g,
+              allData: data,
+              onFilterRequest: this.onFilterRequest,
+            },
+          );
         }
       });
 
@@ -242,7 +250,15 @@ export class BarChartRenderer extends BaseRenderer {
       .on('click', (_event, d) => {
         const value = d[spec.groupBy];
         if (value !== undefined && value !== null) {
-          this.onFilterRequest?.(spec.groupBy, '=', value);
+          this.selectionStrategy.onSelection(
+            [d],
+            [{col: spec.groupBy, op: '=', val: value}],
+            {
+              g,
+              allData: data,
+              onFilterRequest: this.onFilterRequest,
+            },
+          );
         }
       });
 
@@ -428,16 +444,23 @@ export class BarChartRenderer extends BaseRenderer {
           element.__data__ = originalRow;
         }
       })
-      .on('click', (_event) => {
-        // Get the group name from the parent layer
-        const layer = d3.select(
-          (_event.target as Element).parentNode as SVGGElement,
-        );
-        const groupName = layer.datum() as d3.Series<
-          Record<string, string | number>,
-          string
-        >;
-        this.onFilterRequest?.(spec.groupBy, '=', groupName.key);
+      .on('click', (event) => {
+        const element = event.currentTarget as ExtendedElement;
+        const originalRow = element.__data__;
+        if (originalRow) {
+          const value = originalRow[spec.groupBy];
+          if (value !== undefined && value !== null) {
+            this.selectionStrategy.onSelection(
+              [originalRow],
+              [{col: spec.groupBy, op: '=', val: value}],
+              {
+                g,
+                allData: data,
+                onFilterRequest: this.onFilterRequest,
+              },
+            );
+          }
+        }
       })
       .on('mouseover', (event: MouseEvent) => {
         const element = event.currentTarget as ExtendedElement;

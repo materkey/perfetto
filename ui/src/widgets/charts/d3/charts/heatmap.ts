@@ -18,8 +18,9 @@ import {Row, ChartSpec, Filter, Aggregation} from '../data/types';
 import {DataSource} from '../data/source';
 import {formatNumber} from '../utils';
 import {SelectionClipPaths} from './selection_clip_paths';
+import {OpacitySelectionStrategy} from './selection/opacity_selection_strategy';
 
-interface HeatmapCell {
+interface HeatmapCell extends Row {
   x: string;
   y: string;
   value: number;
@@ -27,6 +28,11 @@ interface HeatmapCell {
 
 export class HeatmapRenderer extends BaseRenderer {
   private clipPaths: SelectionClipPaths | null = null;
+
+  constructor() {
+    super();
+    this.selectionStrategy = new OpacitySelectionStrategy();
+  }
 
   async renderWithSource(
     svg: SVGElement,
@@ -103,8 +109,8 @@ export class HeatmapRenderer extends BaseRenderer {
       height,
     );
 
-    // Draw heatmap cells with pointer-events: none
-    this.drawHeatmap(g, aggregatedData, spec, x, y, colorScale);
+    // Draw heatmap cells
+    this.drawHeatmap(g, aggregatedData, data, g, spec, x, y, colorScale);
 
     // Axes
     g.append('g')
@@ -192,6 +198,8 @@ export class HeatmapRenderer extends BaseRenderer {
   private drawHeatmap(
     container: d3.Selection<SVGGElement, unknown, null, undefined>,
     heatmapData: HeatmapCell[],
+    data: Row[],
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
     spec: Extract<ChartSpec, {type: 'heatmap'}>,
     x: d3.ScaleBand<string>,
     y: d3.ScaleBand<string>,
@@ -204,7 +212,7 @@ export class HeatmapRenderer extends BaseRenderer {
       .data(heatmapData)
       .enter()
       .append('rect')
-      .attr('class', 'heatmap-cell')
+      .attr('class', 'heatmap-cell selectable')
       .attr('x', (d) => x(d.x) ?? 0)
       .attr('y', (d) => y(d.y) ?? 0)
       .attr('width', x.bandwidth())
@@ -212,7 +220,24 @@ export class HeatmapRenderer extends BaseRenderer {
       .attr('fill', (d) => colorScale(d.value))
       .attr('stroke', '#fff')
       .attr('stroke-width', 1)
-      .style('opacity', opacity);
+      .style('opacity', opacity)
+      .style('cursor', 'pointer')
+      .style('pointer-events', 'all')
+      .on('click', (_event, d) => {
+        this.selectionStrategy.onSelection(
+          [d],
+          [
+            {col: spec.x, op: '=', val: d.x},
+            {col: spec.y, op: '=', val: d.y},
+          ],
+          {
+            g,
+            allData: data,
+            onFilterRequest: this.onFilterRequest,
+            updateSourceFilter: true,
+          },
+        );
+      });
 
     // Only add tooltips to the main layer (not dimmed/highlight layers)
     if (enableTooltip) {
@@ -312,6 +337,8 @@ export class HeatmapRenderer extends BaseRenderer {
           this.drawHeatmap(
             g.append('g').attr('class', 'heatmap-dimmed'),
             heatmapData,
+            data,
+            g,
             spec,
             scales.x,
             scales.y,
@@ -336,6 +363,8 @@ export class HeatmapRenderer extends BaseRenderer {
                 .attr('class', 'heatmap-highlight')
                 .attr('clip-path', clipUrl),
               heatmapData,
+              data,
+              g,
               spec,
               scales.x,
               scales.y,
@@ -366,10 +395,14 @@ export class HeatmapRenderer extends BaseRenderer {
 
         // Use strategy pattern for selection handling
         if (this.selectionStrategy !== undefined) {
-          this.selectionStrategy.onSelection([], filters, {
+          const selectedCells = heatmapData.filter(
+            (d) => selectedX.includes(d.x) && selectedY.includes(d.y),
+          );
+          this.selectionStrategy.onSelection(selectedCells, filters, {
             g,
             allData: data,
             onFilterRequest: this.onFilterRequest,
+            updateSourceFilter: true,
           });
         }
       });
@@ -397,6 +430,7 @@ export class HeatmapRenderer extends BaseRenderer {
             g,
             allData: data,
             onFilterRequest: this.onFilterRequest,
+            updateSourceFilter: true,
           });
         }
       }

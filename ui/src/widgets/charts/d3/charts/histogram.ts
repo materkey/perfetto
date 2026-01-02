@@ -106,9 +106,18 @@ export class HistogramRenderer extends BaseRenderer {
       .style('cursor', 'pointer')
       .on('click', (_event, d) => {
         if (d.x0 !== undefined && d.x1 !== undefined) {
-          // Set range filter
-          this.onFilterRequest?.(spec.x, '>=', d.x0);
-          this.onFilterRequest?.(spec.x, '<', d.x1);
+          this.selectionStrategy.onSelection(
+            d.map((v: number) => ({[spec.x]: v})) as Row[],
+            [
+              {col: spec.x, op: '>=', val: d.x0},
+              {col: spec.x, op: '<', val: d.x1},
+            ],
+            {
+              g,
+              allData: data,
+              onFilterRequest: this.onFilterRequest,
+            },
+          );
         }
       });
 

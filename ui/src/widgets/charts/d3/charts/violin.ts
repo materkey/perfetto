@@ -231,7 +231,7 @@ export class ViolinRenderer extends BaseRenderer {
           `translate(${(xScale(d.category) ?? 0) + xScale.bandwidth() / 2}, 0)`,
       )
       .style('opacity', opacity)
-      .style('pointer-events', 'none');
+      .style('pointer-events', 'all');
 
     // Violin shape
     violinGroups
