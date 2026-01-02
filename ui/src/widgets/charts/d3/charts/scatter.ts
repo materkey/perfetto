@@ -18,11 +18,13 @@ import {Row, ChartSpec, Filter} from '../data/types';
 import {DataSource} from '../data/source';
 import {formatNumber} from '../utils';
 import {ScatterBrush} from './brushing';
+import {OpacitySelectionStrategy} from './selection/opacity_selection_strategy';
 
 export class ScatterRenderer extends BaseRenderer {
   constructor() {
     super();
     this.brushBehavior = new ScatterBrush();
+    this.selectionStrategy = new OpacitySelectionStrategy();
   }
 
   async renderWithSource(
@@ -121,11 +123,22 @@ export class ScatterRenderer extends BaseRenderer {
       .attr('stroke-width', 0.5)
       .style('cursor', 'pointer')
       .on('click', (_event, d) => {
-        if (spec.colorBy) {
-          const value = d[spec.colorBy];
-          if (value !== undefined && value !== null) {
-            this.onFilterRequest?.(spec.colorBy, '=', value);
-          }
+        const xVal = d[spec.x];
+        const yVal = d[spec.y];
+        if (xVal !== undefined && yVal !== undefined) {
+          this.selectionStrategy.onSelection(
+            [d],
+            [
+              {col: spec.x, op: '=', val: xVal},
+              {col: spec.y, op: '=', val: yVal},
+            ],
+            {
+              g,
+              allData: data,
+              onFilterRequest: this.onFilterRequest,
+              updateSourceFilter: false,
+            },
+          );
         }
       });
 
