@@ -35,7 +35,11 @@ export class BarChartRenderer extends BaseRenderer {
 
     // Query data with filters and aggregation
     const aggregation = this.getAggregation(spec);
-    const data = await source.query(filters, aggregation);
+    const rawData = await source.query(filters, aggregation);
+    const data = this.sortData(
+      rawData,
+      spec as Extract<ChartSpec, {type: 'bar'}>,
+    );
 
     // Delegate to existing render logic
     this.render(svg, data, spec);
@@ -73,6 +77,57 @@ export class BarChartRenderer extends BaseRenderer {
     } else {
       this.renderSimple(svg, g, data, spec, width, height);
     }
+  }
+
+  private sortData(
+    data: Row[],
+    spec: Extract<ChartSpec, {type: 'bar'}>,
+  ): Row[] {
+    if (!spec.sort) {
+      return data;
+    }
+
+    // For stacked charts, calculate total value for each x-category and sort by that
+    if (spec.groupBy && spec.mode === 'stacked') {
+      const totals = new Map<string, number>();
+      data.forEach((row) => {
+        const category = String(row[spec.x]);
+        const value = Number(row[spec.y]) || 0;
+        totals.set(category, (totals.get(category) ?? 0) + value);
+      });
+
+      const {direction} = spec.sort;
+      return [...data].sort((a, b) => {
+        const totalA = totals.get(String(a[spec.x])) ?? 0;
+        const totalB = totals.get(String(b[spec.x])) ?? 0;
+        if (totalA < totalB) {
+          return direction === 'asc' ? -1 : 1;
+        }
+        if (totalA > totalB) {
+          return direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    const {by, direction} = spec.sort;
+    const column = by === 'x' ? spec.x : spec.y;
+
+    return [...data].sort((a, b) => {
+      const valA = a[column];
+      const valB = b[column];
+
+      if (valA === undefined || valA === null) return 1;
+      if (valB === undefined || valB === null) return -1;
+
+      if (valA < valB) {
+        return direction === 'asc' ? -1 : 1;
+      }
+      if (valA > valB) {
+        return direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
   }
 
   private getAggregation(spec: ChartSpec): Aggregation | undefined {
@@ -248,11 +303,20 @@ export class BarChartRenderer extends BaseRenderer {
       .attr('fill', (d) => colorScale(String(d[spec.groupBy])))
       .style('cursor', 'pointer')
       .on('click', (_event, d) => {
-        const value = d[spec.groupBy];
-        if (value !== undefined && value !== null) {
+        const groupValue = d[spec.groupBy];
+        const xValue = d[spec.x];
+        if (
+          groupValue !== undefined &&
+          groupValue !== null &&
+          xValue !== undefined &&
+          xValue !== null
+        ) {
           this.selectionStrategy.onSelection(
             [d],
-            [{col: spec.groupBy, op: '=', val: value}],
+            [
+              {col: spec.groupBy, op: '=', val: groupValue},
+              {col: spec.x, op: '=', val: xValue},
+            ],
             {
               g,
               allData: data,
@@ -448,11 +512,20 @@ export class BarChartRenderer extends BaseRenderer {
         const element = event.currentTarget as ExtendedElement;
         const originalRow = element.__data__;
         if (originalRow) {
-          const value = originalRow[spec.groupBy];
-          if (value !== undefined && value !== null) {
+          const groupValue = originalRow[spec.groupBy];
+          const xValue = originalRow[spec.x];
+          if (
+            groupValue !== undefined &&
+            groupValue !== null &&
+            xValue !== undefined &&
+            xValue !== null
+          ) {
             this.selectionStrategy.onSelection(
               [originalRow],
-              [{col: spec.groupBy, op: '=', val: value}],
+              [
+                {col: spec.groupBy, op: '=', val: groupValue},
+                {col: spec.x, op: '=', val: xValue},
+              ],
               {
                 g,
                 allData: data,

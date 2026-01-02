@@ -63,6 +63,8 @@ interface ChartCreatorState {
   bins: number;
   mode: 'grouped' | 'stacked';
   showCorrelation: boolean;
+  sortBy: 'x' | 'y';
+  sortDirection: 'asc' | 'desc';
 }
 
 // Table view state with filter subscription
@@ -106,6 +108,8 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
     bins: 20,
     mode: 'grouped',
     showCorrelation: false,
+    sortBy: 'x',
+    sortDirection: 'asc',
   };
 
   oninit({attrs}: m.Vnode<D3ChartsPageAttrs>) {
@@ -195,6 +199,41 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
           this.errorMessage =
             'Query executed successfully but returned no data. Try adjusting your query or increasing the LIMIT.';
         }
+
+        // Add sample charts
+        this.charts.push(
+          new Chart(
+            {
+              type: 'bar',
+              x: 'name',
+              y: 'dur',
+              aggregation: 'sum',
+              sort: {
+                by: 'y',
+                direction: 'desc',
+              },
+            },
+            this.dataSource,
+            this.filterStore,
+          ),
+        );
+
+        this.charts.push(
+          new Chart(
+            {
+              type: 'bar',
+              x: 'name',
+              y: 'dur',
+              aggregation: 'sum',
+              sort: {
+                by: 'x',
+                direction: 'asc',
+              },
+            },
+            this.dataSource,
+            this.filterStore,
+          ),
+        );
       }
 
       m.redraw();
@@ -221,6 +260,8 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
       bins: 20,
       mode: 'grouped',
       showCorrelation: false,
+      sortBy: 'x',
+      sortDirection: 'asc',
     };
   }
 
@@ -267,6 +308,8 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
       bins,
       mode,
       showCorrelation,
+      sortBy,
+      sortDirection,
     } = this.chartCreator;
 
     // Handle table separately
@@ -286,6 +329,10 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
           aggregation,
           groupBy: groupByColumn || undefined,
           mode: mode,
+          sort: {
+            by: sortBy,
+            direction: sortDirection,
+          },
         };
         break;
       case 'histogram':
@@ -1225,6 +1272,76 @@ export class D3ChartsPage implements m.ClassComponent<D3ChartsPageAttrs> {
                           [
                             m('option', {value: 'grouped'}, 'Grouped'),
                             m('option', {value: 'stacked'}, 'Stacked'),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                  // Sort By (for bar chart)
+                  this.chartCreator.selectedType === 'bar' &&
+                    m(
+                      FormLabel,
+                      {
+                        style: {
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                        },
+                      },
+                      [
+                        m(
+                          'span',
+                          {style: {fontSize: '12px', fontWeight: 500}},
+                          'Sort By',
+                        ),
+                        m(
+                          Select,
+                          {
+                            value: this.chartCreator.sortBy,
+                            onchange: (e: Event) => {
+                              this.chartCreator.sortBy = (
+                                e.target as HTMLSelectElement
+                              ).value as 'x' | 'y';
+                            },
+                          },
+                          [
+                            m('option', {value: 'x'}, 'X Column'),
+                            m('option', {value: 'y'}, 'Y Column'),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                  // Sort Direction (for bar chart)
+                  this.chartCreator.selectedType === 'bar' &&
+                    m(
+                      FormLabel,
+                      {
+                        style: {
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                        },
+                      },
+                      [
+                        m(
+                          'span',
+                          {style: {fontSize: '12px', fontWeight: 500}},
+                          'Sort Direction',
+                        ),
+                        m(
+                          Select,
+                          {
+                            value: this.chartCreator.sortDirection,
+                            onchange: (e: Event) => {
+                              this.chartCreator.sortDirection = (
+                                e.target as HTMLSelectElement
+                              ).value as 'asc' | 'desc';
+                            },
+                          },
+                          [
+                            m('option', {value: 'asc'}, 'Ascending'),
+                            m('option', {value: 'desc'}, 'Descending'),
                           ],
                         ),
                       ],

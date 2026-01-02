@@ -52,6 +52,7 @@ const barChart = new Chart(
     x: 'category',
     y: 'value',
     aggregation: 'sum',
+    sort: {by: 'y', direction: 'desc'},
   },
   dataSource,
   filterStore,
@@ -65,6 +66,7 @@ const groupedBarChart = new Chart(
     aggregation: 'sum',
     groupBy: 'type',
     mode: 'grouped',
+    sort: {by: 'x', direction: 'asc'},
   },
   dataSource,
   filterStore,
@@ -78,6 +80,7 @@ const stackedBarChart = new Chart(
     aggregation: 'sum',
     groupBy: 'type',
     mode: 'stacked',
+    sort: {by: 'y', direction: 'asc'},
   },
   dataSource,
   filterStore,
@@ -226,7 +229,7 @@ export function renderD3Charts(_app: App): m.Children {
     }),
 
     renderDocSection(
-      'Bar Chart',
+      'Bar Chart (sorted by value, descending)',
       m('.chart-demo-container', [
         m('p', 'Aggregated bar chart with click-to-filter functionality.'),
         m(ChartWidget, {chart: barChart}),
@@ -234,7 +237,7 @@ export function renderD3Charts(_app: App): m.Children {
     ),
 
     renderDocSection(
-      'Grouped Bar Chart',
+      'Grouped Bar Chart (sorted by category, ascending)',
       m('.chart-demo-container', [
         m(
           'p',
@@ -245,7 +248,7 @@ export function renderD3Charts(_app: App): m.Children {
     ),
 
     renderDocSection(
-      'Stacked Bar Chart',
+      'Stacked Bar Chart (sorted by value, ascending)',
       m('.chart-demo-container', [
         m(
           'p',

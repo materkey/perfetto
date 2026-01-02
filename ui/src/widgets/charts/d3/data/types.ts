@@ -50,6 +50,11 @@ export type Aggregation = {
 
 export type Row = Record<string, string | number | boolean | null | undefined>;
 
+export type Sort = {
+  by: 'x' | 'y';
+  direction: 'asc' | 'desc';
+};
+
 export type ChartSpec =
   | {
       type: 'bar';
@@ -58,6 +63,7 @@ export type ChartSpec =
       aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
       groupBy?: string;
       mode?: 'grouped' | 'stacked';
+      sort?: Sort;
     }
   | {type: 'histogram'; x: string; bins?: number}
   | {type: 'cdf'; x: string; colorBy?: string}
