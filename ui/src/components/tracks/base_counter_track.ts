@@ -405,6 +405,11 @@ export abstract class BaseCounterTrack implements TrackRenderer {
   private options?: CounterOptions;
   private readonly rangeSharer: RangeSharer;
 
+  // Optional end timestamp for the process/thread this counter belongs to.
+  // If set, the counter graph will be clipped at this time instead of
+  // extending to the right edge of the viewport.
+  protected processEndTs?: time;
+
   private readonly trash: AsyncDisposableStack;
 
   private getCounterOptions(): CounterOptions {
@@ -783,6 +788,13 @@ export abstract class BaseCounterTrack implements TrackRenderer {
     const effectiveHeight = this.getHeight() - MARGIN_TOP;
     const endPx = size.width;
 
+    // If processEndTs is set, clip the graph at that time instead of
+    // extending to the right edge of the viewport.
+    const effectiveEndPx =
+      this.processEndTs !== undefined
+        ? Math.min(endPx, Math.floor(timescale.timeToPx(this.processEndTs)))
+        : endPx;
+
     // Use hue to differentiate the scale of the counter value
     const exp = Math.ceil(Math.log10(Math.max(yMax, 1)));
     const expCapped = Math.min(exp - 3, 9);
@@ -832,8 +844,8 @@ export abstract class BaseCounterTrack implements TrackRenderer {
       }
       lastDrawnY = lastY;
     }
-    ctx.lineTo(endPx, lastDrawnY);
-    ctx.lineTo(endPx, zeroY);
+    ctx.lineTo(effectiveEndPx, lastDrawnY);
+    ctx.lineTo(effectiveEndPx, zeroY);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();

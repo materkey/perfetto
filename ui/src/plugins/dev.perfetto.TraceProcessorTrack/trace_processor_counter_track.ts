@@ -35,6 +35,48 @@ export class TraceProcessorCounterTrack extends BaseCounterTrack {
     super(trace, uri, options);
   }
 
+  async onInit(): Promise<void> {
+    // Query the process end_ts for this track's associated process (if any).
+    // This allows the counter graph to be clipped at process termination
+    // instead of extending to the right edge of the viewport.
+    //
+    // We try multiple approaches:
+    // 1. Get end_ts from process table (set by sched_process_free ftrace event)
+    // 2. If end_ts is NULL, use the last counter timestamp as a proxy
+    //    (this happens when ftrace events are not available, e.g., in Docker)
+    const query = `
+      SELECT
+        p.end_ts,
+        (SELECT MAX(c.ts) FROM counter c WHERE c.track_id = ${this.trackId}) as last_counter_ts
+      FROM process_counter_track pct
+      JOIN process p ON pct.upid = p.upid
+      WHERE pct.id = ${this.trackId}
+    `;
+    try {
+      const result = await this.engine.query(query);
+      const it = result.iter({end_ts: LONG_NULL, last_counter_ts: LONG_NULL});
+      if (it.valid()) {
+        if (it.end_ts !== null) {
+          this.processEndTs = Time.fromRaw(it.end_ts);
+          console.log(
+            `[ProcessEndTs] Track ${this.trackId}: end_ts=${it.end_ts}`,
+          );
+        } else if (it.last_counter_ts !== null) {
+          // Use last counter timestamp as proxy for process end
+          this.processEndTs = Time.fromRaw(it.last_counter_ts);
+          console.log(
+            `[ProcessEndTs] Track ${this.trackId}: last_counter_ts=${it.last_counter_ts}`,
+          );
+        }
+      }
+    } catch (e) {
+      // Query failed - track is not a process_counter_track, ignore
+      console.log(
+        `[ProcessEndTs] Track ${this.trackId}: query failed (not a process counter track)`,
+      );
+    }
+  }
+
   getSqlSource() {
     return `
       select
