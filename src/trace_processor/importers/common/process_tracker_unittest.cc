@@ -336,5 +336,38 @@ TEST_F(ProcessTrackerTest, NamespacedThreadMissingProcess) {
   // In this test, we just verify the function returns false.
 }
 
+TEST_F(ProcessTrackerTest, LastSeenTsFallbackForEndTs) {
+  // Create a process without an end_ts (simulating no sched_process_free).
+  UniquePid upid = context.process_tracker->GetOrCreateProcess(100);
+
+  // Set last_seen_ts (from ProcessStats).
+  context.process_tracker->SetProcessLastSeenTs(100, 5000000000);
+
+  // Simulate end of trace - this should use last_seen_ts as fallback.
+  context.process_tracker->NotifyEndOfFile();
+
+  // Verify end_ts is set from last_seen_ts.
+  auto end_ts = context.storage->process_table()[upid].end_ts();
+  ASSERT_TRUE(end_ts.has_value());
+  ASSERT_EQ(*end_ts, 5000000000);
+}
+
+TEST_F(ProcessTrackerTest, LastSeenTsDoesNotOverrideExistingEndTs) {
+  // Create a process and end it via EndThread (simulating sched_process_free).
+  UniquePid upid = context.process_tracker->GetOrCreateProcess(200);
+  context.process_tracker->EndThread(3000000000, 200);
+
+  // Set last_seen_ts to a later time.
+  context.process_tracker->SetProcessLastSeenTs(200, 5000000000);
+
+  // NotifyEndOfFile should NOT override the existing end_ts.
+  context.process_tracker->NotifyEndOfFile();
+
+  // Verify end_ts remains from EndThread, not last_seen_ts.
+  auto end_ts = context.storage->process_table()[upid].end_ts();
+  ASSERT_TRUE(end_ts.has_value());
+  ASSERT_EQ(*end_ts, 3000000000);
+}
+
 }  // namespace
 }  // namespace perfetto::trace_processor

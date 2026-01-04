@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include <memory>
+#include <set>
 
 #include "perfetto/ext/base/file_utils.h"
 #include "perfetto/ext/base/string_utils.h"
@@ -736,6 +737,92 @@ TEST_F(ProcessStatsDataSourceTest, WriteKthread) {
   ASSERT_THAT(process.cmdline(), ElementsAreArray({"kthreadd"}));
   EXPECT_TRUE(process.is_kthread());
   EXPECT_TRUE(process.cmdline_is_comm());
+}
+
+// Verifies that WriteAllProcessStats writes last_seen_ts for each process.
+// last_seen_ts is used as a fallback for process end_ts when ftrace events
+// (sched_process_free) are unavailable (e.g., in Docker containers).
+TEST_F(ProcessStatsDataSourceTest, WritesLastSeenTsForEachProcess) {
+  DataSourceConfig ds_config;
+  ProcessStatsConfig cfg;
+  cfg.set_proc_stats_poll_ms(1);
+  cfg.add_quirks(ProcessStatsConfig::DISABLE_ON_DEMAND);
+  ds_config.set_process_stats_config_raw(cfg.SerializeAsString());
+  auto data_source = GetProcessStatsDataSource(ds_config);
+
+  // Populate a fake /proc/ directory with two processes.
+  auto fake_proc = base::TempDir::Create();
+  const int kPids[] = {10, 20};
+  std::vector<std::string> dirs_to_delete;
+  for (int pid : kPids) {
+    base::StackString<256> path("%s/%d", fake_proc.path().c_str(), pid);
+    dirs_to_delete.push_back(path.ToStdString());
+    ASSERT_EQ(mkdir(path.c_str(), 0755), 0);
+  }
+
+  auto checkpoint = task_runner_.CreateCheckpoint("done");
+
+  const std::string& fake_proc_path = fake_proc.path();
+  EXPECT_CALL(*data_source, OpenProcDir()).WillRepeatedly([&fake_proc_path] {
+    return base::ScopedDir(opendir(fake_proc_path.c_str()));
+  });
+
+  int iter = 0;
+  for (int pid : kPids) {
+    EXPECT_CALL(*data_source, ReadProcPidFile(pid, "status"))
+        .WillRepeatedly([](int32_t p, const std::string&) {
+          return base::StackString<256>(
+                     "Name:	proc_%d\nVmSize: 100 kB\nVmRSS: 50 kB\n", p)
+              .ToStdString();
+        });
+    EXPECT_CALL(*data_source, ReadProcPidFile(pid, "oom_score_adj"))
+        .WillRepeatedly(
+            [checkpoint, kPids, &iter](int32_t inner_pid, const std::string&) {
+              if (inner_pid == kPids[base::ArraySize(kPids) - 1]) {
+                if (++iter >= 1)
+                  checkpoint();
+              }
+              return "0";
+            });
+  }
+
+  data_source->Start();
+  task_runner_.RunUntilCheckpoint("done");
+  data_source->Flush(1, []() {});
+
+  // Collect all process stats from trace packets.
+  std::vector<protos::gen::ProcessStats::Process> processes;
+  auto trace = writer_raw_->GetAllTracePackets();
+  for (const auto& packet : trace) {
+    for (const auto& process : packet.process_stats().processes()) {
+      processes.push_back(process);
+    }
+  }
+
+  // Verify we got stats for both processes.
+  ASSERT_GE(processes.size(), 2u);
+
+  // Check that each process has a valid last_seen_ts.
+  // Since we have two PIDs, we should find last_seen_ts for each.
+  std::set<int32_t> pids_with_last_seen_ts;
+  for (const auto& proc : processes) {
+    if (proc.has_last_seen_ts()) {
+      EXPECT_GT(proc.last_seen_ts(), 0u)
+          << "last_seen_ts should be positive for pid " << proc.pid();
+      pids_with_last_seen_ts.insert(proc.pid());
+    }
+  }
+
+  // Verify both processes have last_seen_ts set.
+  for (int pid : kPids) {
+    EXPECT_TRUE(pids_with_last_seen_ts.count(pid))
+        << "Process " << pid << " should have last_seen_ts set";
+  }
+
+  // Cleanup fake_proc.
+  for (auto path = dirs_to_delete.rbegin(); path != dirs_to_delete.rend();
+       path++)
+    base::Rmdir(*path);
 }
 
 }  // namespace

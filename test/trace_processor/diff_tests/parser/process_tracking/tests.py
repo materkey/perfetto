@@ -541,3 +541,21 @@ class ProcessTracking(TestSuite):
         27,27,"ksoftirqd/1","ksoftirqd/1"
         28,28,"kworker/1:0","kworker/1:0"
         """))
+
+  # Test that last_seen_ts from process_stats is used as fallback for end_ts
+  # when ftrace events (sched_process_free) are unavailable.
+  def test_last_seen_ts_fallback_for_end_ts(self):
+    return DiffTestBlueprint(
+        trace=Path('synth_last_seen_ts.py'),
+        query="""
+        SELECT pid, end_ts
+        FROM process
+        WHERE pid IN (100, 200, 300)
+        ORDER BY pid;
+        """,
+        out=Csv("""
+        "pid","end_ts"
+        100,5000000000
+        200,3000000000
+        300,"[NULL]"
+        """))
