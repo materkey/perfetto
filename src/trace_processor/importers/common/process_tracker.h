@@ -223,6 +223,10 @@ class ProcessTracker {
   // Called when the trace was fully loaded.
   void NotifyEndOfFile();
 
+  // Sets the last seen timestamp for a process. This is used as a fallback
+  // for process end_ts when ftrace events (sched_process_free) are unavailable.
+  void SetProcessLastSeenTs(int64_t pid, int64_t ts);
+
   // Tracks the namespace-local pids for a process running in a pid namespace.
   void UpdateNamespacedProcess(int64_t pid, std::vector<int64_t> nspid);
 
@@ -322,6 +326,10 @@ class ProcessTracker {
   // Keeps track pid-namespaced processes, keyed by root-level pids.
   std::unordered_map<int64_t /* pid (aka tgid) */, NamespacedProcess>
       namespaced_processes_;
+
+  // Mapping from pid to last_seen_ts (nanoseconds since boot).
+  // Used as fallback for process end_ts when ftrace events are unavailable.
+  std::unordered_map<int64_t /* pid */, int64_t /* ts */> process_last_seen_ts_;
 
   UniquePid swapper_upid_ = 0;
   UniqueTid swapper_utid_ = 0;

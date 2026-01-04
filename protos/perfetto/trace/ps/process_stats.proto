@@ -97,6 +97,12 @@ message ProcessStats {
 
     // The total size of all dmabufs referenced by a process via FDs or VMAs.
     optional uint64 dmabuf_rss_kb = 24;
+
+    // Last timestamp (in nanoseconds since boot) when this process was seen
+    // alive during /proc scanning. Used as a fallback for process end_ts when
+    // ftrace events (sched_process_free) are unavailable (e.g., in Docker).
+    // This is typically recorded at the end of a tracing session.
+    optional uint64 last_seen_ts = 25;
   }
   repeated Process processes = 1;
 

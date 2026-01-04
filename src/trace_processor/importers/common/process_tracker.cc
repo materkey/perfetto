@@ -660,6 +660,21 @@ ArgsTracker::BoundInserter ProcessTracker::AddArgsToThread(UniqueTid utid) {
 
 void ProcessTracker::NotifyEndOfFile() {
   args_tracker_.Flush();
+
+  // Use last_seen_ts as fallback for process end_ts when ftrace events
+  // (sched_process_free) are unavailable (e.g., in Docker).
+  auto& process_table = *context_->storage->mutable_process_table();
+  for (auto it = process_table.IterateRows(); it; ++it) {
+    if (it.end_ts().has_value()) {
+      continue;
+    }
+    auto pid = it.pid();
+    auto last_seen_it = process_last_seen_ts_.find(pid);
+    if (last_seen_it != process_last_seen_ts_.end()) {
+      it.set_end_ts(last_seen_it->second);
+    }
+  }
+
   tids_.Clear();
   pids_.Clear();
   pending_assocs_.clear();
@@ -668,6 +683,14 @@ void ProcessTracker::NotifyEndOfFile() {
   trusted_pids_.clear();
   namespaced_threads_.clear();
   namespaced_processes_.clear();
+  process_last_seen_ts_.clear();
+}
+
+void ProcessTracker::SetProcessLastSeenTs(int64_t pid, int64_t ts) {
+  auto& existing = process_last_seen_ts_[pid];
+  if (ts > existing) {
+    existing = ts;
+  }
 }
 
 void ProcessTracker::UpdateNamespacedProcess(int64_t pid,

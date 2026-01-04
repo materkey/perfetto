@@ -541,7 +541,7 @@ void ProcessStatsDataSource::Tick(
 }
 
 void ProcessStatsDataSource::WriteAllProcessStats() {
-  CacheProcFsScanStartTimestamp();
+  uint64_t scan_ts = CacheProcFsScanStartTimestamp();
   PERFETTO_METATRACE_SCOPED(TAG_PROC_POLLERS, PS_WRITE_ALL_PROCESS_STATS);
   base::ScopedDir proc_dir = OpenProcDir();
   if (!proc_dir)
@@ -550,6 +550,12 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
   while (int32_t pid = ReadNextNumericDir(*proc_dir)) {
     cur_ps_stats_process_ = nullptr;
     uint32_t pid_u = static_cast<uint32_t>(pid);
+
+    // Write last_seen_ts directly to proto. This is used as a fallback for
+    // process end_ts when ftrace events are unavailable (e.g., in Docker).
+    // We write it immediately rather than caching because process_stats_cache_
+    // is periodically cleared based on proc_stats_cache_ttl_ms.
+    GetOrCreateStatsProcess(pid)->set_last_seen_ts(scan_ts);
 
     // optional /proc/pid/stat fields
     if (record_process_runtime_) {

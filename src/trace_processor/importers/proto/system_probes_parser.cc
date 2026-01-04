@@ -826,6 +826,14 @@ void SystemProbesParser::ParseProcessStats(int64_t ts, ConstBytes blob) {
         continue;
       }
 
+      // Last seen timestamp is used as fallback for process end_ts when
+      // ftrace events (sched_process_free) are unavailable.
+      if (fld.id() == Process::kLastSeenTsFieldNumber) {
+        context_->process_tracker->SetProcessLastSeenTs(
+            static_cast<int64_t>(pid), static_cast<int64_t>(fld.as_uint64()));
+        continue;
+      }
+
       // No handling for this field, so increment the error counter.
       context_->storage->IncrementStats(stats::proc_stat_unknown_counters);
     }
